@@ -42,9 +42,12 @@ for f in figs:
     f.extra_y_ranges = {"foo": Range1d(start=-1, end=1)}
 
 [f.add_layout(LinearAxis(y_range_name="foo"), 'right') for f in figs]
-cds = [ColumnDataSource(data=dict(x=[0], y=[0], f=[0])) for i in range(8)]
-lines = [(figs[i].line('x', 'y', source=cds[i], line_alpha=0.5),
-          figs[i].line('x', 'f', source=cds[i], line_color='red', y_range_name="foo", line_width=2)) for i in range(8)]
+
+cds = ColumnDataSource(data={i: [] for i in [item for sublist in
+                                            [['y'+str(i), 'f'+str(i)] for i in range(8)] for item in sublist]+['x']})
+
+lines = [(figs[i].line('x', 'y'+str(i), source=cds, line_alpha=0.5),
+          figs[i].line('x', 'f'+str(i), source=cds, line_color='red', y_range_name="foo", line_width=2)) for i in range(8)]
 for f in figs:
     f.axis.visible = False
 
@@ -72,12 +75,13 @@ def update_test_charts(nd, sd):
     nd = np.array(nd)
     lsd = len(sd)   # calculate before, as sd can change during stream
 
-    for i in range(8):
+    update_data = {'x': np.arange(lsd - len(nd[:, 0]), lsd, 1)}
 
-        cds[i].stream({'y': nd[:, i],
-                       'f': online_filters[i].filter(nd[:, i]),
-                       'x': np.arange(lsd - len(nd[:, i]), lsd, 1)
-                       }, 300)
+    for i in range(8):
+        update_data['f'+str(i)] = online_filters[i].filter(nd[:, i])
+        update_data['y'+str(i)] = nd[:, i]
+
+    cds.stream(update_data, 300)
 
 
 ses_data = []
@@ -107,10 +111,6 @@ def updater():
             if test_phase:
                 doc.add_next_tick_callback(partial(update_test_charts, nd=new_data, sd=ses_data))
 
-                print '---------new_line'
-                print cds[0].to_df()['x'].values
-                print cds[7].to_df()['x'].values
-
             new_data = []
 
 
@@ -124,7 +124,7 @@ thread.start()
 
 # todo custom spectrogram for group by
 # todo log_id for headset data
-# todo git commit
+
 
 
 
