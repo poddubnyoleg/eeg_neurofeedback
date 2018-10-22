@@ -28,25 +28,6 @@ class OnlineFilter:
         return y
 
 
-fs_Hz = 250.0
-NFFT = 256*2  # pitck the length of the fft
-FFTstep = 1.*fs_Hz  # do a new FFT every half second
-overlap = NFFT - FFTstep  # half-second steps
-f_lim_Hz = [0, 40]   # frequency limits for plotting
-
-
-def get_features(x):
-    spec_PSDperHz, freqs, t = mlab.specgram(x,
-                                            NFFT=NFFT,
-                                            window=mlab.window_hanning,
-                                            Fs=fs_Hz,
-                                            noverlap=overlap
-                                            )
-    keep_columns = [f for f in freqs if (f >= f_lim_Hz[0] and f <= f_lim_Hz[1])]
-    spec_PSDperBin = spec_PSDperHz * fs_Hz / float(NFFT)
-    X = pd.DataFrame(10 * np.log10(spec_PSDperBin), index=freqs).T
-    X = X[keep_columns]
-    X['second'] = [int(round(i)) for i in t]
-
-    return X
-
+def spectral_features(x):
+    # parameters taken following research
+    return pd.Series(20 * np.log10(np.abs(np.fft.rfft(x*np.hanning(len(x)), n=256*2))[:80]))

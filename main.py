@@ -2,10 +2,12 @@
 import multiprocessing
 import feature_generation
 from bokeh.models.sources import ColumnDataSource
+from bokeh.models import LinearColorMapper
 from bokeh.plotting import figure, curdoc
 from bokeh.layouts import row, column, widgetbox
 from bokeh.models.widgets import TextInput, Button
 from bokeh.models import LinearAxis, Range1d
+from bokeh.transform import transform
 from functools import partial
 from threading import Thread
 from tornado import gen
@@ -61,6 +63,24 @@ def starter():
     global test_phase
     test_phase = False
 
+    # redraw figs with heatmaps
+    cds2 = ColumnDataSource({'value': np.random.rand(1000), 'y': np.tile(np.arange(0, 10, 1), 100),
+                            'x': np.repeat(np.arange(0, 100, 1), 10)})
+    colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+    mapper = LinearColorMapper(palette=colors, low=10, high=50)
+
+    fig2 = figure(plot_width=500, plot_height=100, toolbar_location=None)
+    fig2.rect(x="x", y="y", width=1, height=1, source=cds2,
+           line_color=None, fill_color={'field': 'value', 'transform': mapper})
+
+    fig2.axis.axis_line_color = None
+    fig2.axis.major_tick_line_color = None
+    fig2.axis.major_label_text_font_size = "5pt"
+    fig2.axis.major_label_standoff = 0
+    fig2.xaxis.major_label_orientation = 1.0
+
+    layout.children[0].children[0] = fig2
+
 
 update = Button(label="Start session")
 update.on_click(starter)
@@ -68,7 +88,8 @@ inputs = widgetbox([update], width=200)
 
 doc = curdoc()
 
-doc.add_root(column(row(figs[0:2]), row(figs[2:4]), row(figs[4:6]), row(figs[6:]), inputs))
+layout = column(row(figs[0:2]), row(figs[2:4]), row(figs[4:6]), row(figs[6:]), inputs)
+doc.add_root(layout)
 
 
 def update_test_charts(nd, sd):
@@ -122,7 +143,8 @@ thread.daemon = True    # to end session properly when terminating main thread w
 thread.start()
 
 
-# todo custom spectrogram for group by
+# todo on click replace with spectras
+# todo on click calculate initial dataset and start update it <- and start store features dataset
 # todo log_id for headset data
 
 
