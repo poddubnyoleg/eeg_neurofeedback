@@ -1,4 +1,4 @@
-#import open_bci_connector
+# import open_bci_connector
 import multiprocessing
 import feature_generation
 from bokeh.models.sources import ColumnDataSource
@@ -11,6 +11,7 @@ from bokeh.transform import transform
 from functools import partial
 from threading import Thread
 from tornado import gen
+import pandas as pd
 
 import numpy as np
 import time
@@ -27,82 +28,105 @@ if fake_data:
     def streaming():
         while True:
             handle_sample()
-            time.sleep(0.5)
+            time.sleep(0.01)
 else:
 
     def handle_sample(sample):
         global q
-        q.put(sample.channel_data+[time.time()]+[sample.id])
+        q.put(sample.channel_data + [time.time()] + [sample.id])
 
 
     def streaming():
         open_bci_connector.board.start_streaming(handle_sample)
 
 
-figs = [figure(plot_width=500, plot_height=100, toolbar_location=None) for i in range(8)]
+# create charts for testing headset
+figs = [figure(plot_width=300, plot_height=100, toolbar_location=None) for i in range(8)]
 for f in figs:
     f.extra_y_ranges = {"foo": Range1d(start=-1, end=1)}
 
 [f.add_layout(LinearAxis(y_range_name="foo"), 'right') for f in figs]
 
 cds = ColumnDataSource(data={i: [] for i in [item for sublist in
-                                            [['y'+str(i), 'f'+str(i)] for i in range(8)] for item in sublist]+['x']})
+                                             [['y' + str(i), 'f' + str(i)] for i in range(8)] for item in sublist] +
+                             ['x']})
 
-lines = [(figs[i].line('x', 'y'+str(i), source=cds, line_alpha=0.5),
-          figs[i].line('x', 'f'+str(i), source=cds, line_color='red', y_range_name="foo", line_width=2)) for i in range(8)]
+lines = [(figs[i].line('x', 'y' + str(i), source=cds, line_alpha=0.3),
+          figs[i].line('x', 'f' + str(i), source=cds, line_color='black', y_range_name="foo", line_width=2)) for i in
+         range(8)]
+
 for f in figs:
     f.axis.visible = False
 
+# create charts for visualising features
+cds_feats_data = {'x': [],
+                  'y': []}
+for i in range(8):
+    cds_feats_data['value_' + str(i)] = []
+
+cds_feats = ColumnDataSource(data=cds_feats_data)
+
+colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+mapper = LinearColorMapper(palette=colors, low=-5, high=5)
+
+figs_feats = [figure(plot_width=300, plot_height=100, toolbar_location=None) for i in range(8)]
+for f in figs_feats:
+    f.axis.visible = False
+[figs_feats[i].rect(x="x", y="y", width=1, height=1, source=cds_feats,
+                    line_color=None, fill_color={'field': 'value_' + str(i), 'transform': mapper}) for i in range(8)]
+
+
+
+# init filters
 online_filters = [feature_generation.OnlineFilter(fs=250, notch_f0=50, notch_q=30, low_cut=1, high_cut=40, order=5) for
                   i in range(8)]
 
 test_phase = True
+filtered_data = np.ndarray(shape=(0, 9))
+features_data = pd.DataFrame()
 
 
 def starter():
     global test_phase
+    global online_filters
+    global features_data
+
     test_phase = False
 
-    # redraw figs with heatmaps
-    cds2 = ColumnDataSource({'value': np.random.rand(1000), 'y': np.tile(np.arange(0, 10, 1), 100),
-                            'x': np.repeat(np.arange(0, 100, 1), 10)})
-    colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-    mapper = LinearColorMapper(palette=colors, low=10, high=50)
+    # set initial features data and cds
+    # features data - df, ind - (sec, freq number), cols - electrodes
+    features_data = pd.DataFrame(filtered_data).groupby(8).apply(
+        lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
 
-    fig2 = figure(plot_width=500, plot_height=100, toolbar_location=None)
-    fig2.rect(x="x", y="y", width=1, height=1, source=cds2,
-           line_color=None, fill_color={'field': 'value', 'transform': mapper})
+    cds_data = {'x': features_data.index.get_level_values(0).values,
+                'y': features_data.index.get_level_values(1).values}
+    for i in range(8):
+        cds_data['value_' + str(i)] = features_data[i].values
 
-    fig2.axis.axis_line_color = None
-    fig2.axis.major_tick_line_color = None
-    fig2.axis.major_label_text_font_size = "5pt"
-    fig2.axis.major_label_standoff = 0
-    fig2.xaxis.major_label_orientation = 1.0
-
-    layout.children[0].children[0] = fig2
+    #cds_feats.data = cds_data
 
 
-update = Button(label="Start session")
-update.on_click(starter)
-inputs = widgetbox([update], width=200)
+def update_test_charts(nd, sd, nfd, nfetd):
 
-doc = curdoc()
-
-layout = column(row(figs[0:2]), row(figs[2:4]), row(figs[4:6]), row(figs[6:]), inputs)
-doc.add_root(layout)
-
-
-def update_test_charts(nd, sd):
-    nd = np.array(nd)
-    lsd = len(sd)   # calculate before, as sd can change during stream
+    lsd = len(sd)
 
     update_data = {'x': np.arange(lsd - len(nd[:, 0]), lsd, 1)}
 
     for i in range(8):
-        update_data['f'+str(i)] = online_filters[i].filter(nd[:, i])
-        update_data['y'+str(i)] = nd[:, i]
+        update_data['f' + str(i)] = nfd[:, i]
+        update_data['y' + str(i)] = nd[:, i]
 
     cds.stream(update_data, 300)
+
+    if not test_phase:
+        update_data = {'x': nfetd.index.get_level_values(0).values,
+                       'y': nfetd.index.get_level_values(1).values}
+        print nfetd.index.get_level_values(0).values[0]
+        print nfetd.index.get_level_values(0).values[-1]
+        for i in range(8):
+            update_data['value_' + str(i)] = nfetd[i].values
+
+        cds_feats.stream(update_data, len(nfetd.columns)*8*100)
 
 
 ses_data = []
@@ -112,8 +136,9 @@ p.start()
 
 
 def updater():
-
-    time.sleep(3)   # wait till tornado settles to avoid data mess
+    global filtered_data
+    global features_data
+    time.sleep(3)  # wait till tornado settles to avoid data mess
 
     last_time = time.time()
     new_data = []
@@ -126,29 +151,47 @@ def updater():
             new_data.append(new_q)
             ses_data.append(new_q)
 
-        if int(time.time())-int(last_time) >= 1:
+        if int(time.time()) - int(last_time) >= 1:
+
+            # todo if process consumes more than 1 sec - alert
 
             last_time = time.time()
-            if test_phase:
-                doc.add_next_tick_callback(partial(update_test_charts, nd=new_data, sd=ses_data))
+
+            nd = np.array(new_data)
+
+            # [:,None] - to make arrays the same shape for hstack
+            new_filtered_data = np.hstack([np.array([online_filters[i].filter(nd[:, i])
+                                                     for i in range(8)]).T, nd[:, 9][:, None]])
+            filtered_data = np.append(filtered_data, new_filtered_data, axis=0)
+
+            # get features of current second
+            new_features_data = pd.DataFrame(new_filtered_data).groupby(8).apply(
+                lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
+
+            # todo faster update via iloc
+            features_data = features_data.append(new_features_data)
+            # update charts
+            doc.add_next_tick_callback(partial(update_test_charts, nd=nd, sd=ses_data, nfd=new_filtered_data,
+                                               nfetd=new_features_data))
 
             new_data = []
-
 
         time.sleep(0.001)
 
 
+# create layout
+update = Button(label="Start session")
+update.on_click(starter)
+inputs = widgetbox([update], width=200)
+
+doc = curdoc()
+
+layout = column(row(figs[0:2] + figs_feats[0:2]), row(figs[2:4] + figs_feats[2:4]),
+                row(figs[4:6] + figs_feats[4:6]), row(figs[6:]+figs_feats[6:]), inputs)
+doc.add_root(layout)
+
 thread = Thread(target=updater)
-thread.daemon = True    # to end session properly when terminating main thread with ctrl+c
+thread.daemon = True  # to end session properly when terminating main thread with ctrl+c
 thread.start()
 
-
-# todo on click replace with spectras
-# todo on click calculate initial dataset and start update it <- and start store features dataset
 # todo log_id for headset data
-
-
-
-
-
-
