@@ -1,5 +1,4 @@
 from scipy.signal import butter, lfilter, iirnotch, lfilter_zi
-from matplotlib import mlab
 import pandas as pd
 import numpy as np
 
@@ -28,6 +27,7 @@ class OnlineFilter:
         return y
 
 
+# todo make windowed features instead of averaging of forecast
 def spectral_features(x):
     # parameters taken following research
     return pd.Series(20 * np.log10(np.abs(np.fft.rfft(x*np.hanning(len(x)), n=256*2))[:80]))

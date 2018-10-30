@@ -7,10 +7,8 @@ from bokeh.plotting import figure, curdoc
 from bokeh.layouts import row, column, widgetbox
 from bokeh.models.widgets import TextInput, Button
 from bokeh.models import LinearAxis, Range1d
-from bokeh.transform import transform
 from functools import partial
 from threading import Thread
-from tornado import gen
 import pandas as pd
 
 import numpy as np
@@ -34,12 +32,13 @@ else:
     def handle_sample(sample):
         global q
         q.put(sample.channel_data + [time.time()] + [sample.id])
-
+        # todo log_id for headset data
 
     def streaming():
         open_bci_connector.board.start_streaming(handle_sample)
 
 
+# todo add port selector for real data
 # create charts for testing headset
 figs = [figure(plot_width=300, plot_height=100, toolbar_location=None) for i in range(8)]
 for f in figs:
@@ -52,7 +51,7 @@ cds = ColumnDataSource(data={i: [] for i in [item for sublist in
                              ['x']})
 
 lines = [(figs[i].line('x', 'y' + str(i), source=cds, line_alpha=0.3),
-          figs[i].line('x', 'f' + str(i), source=cds, line_color='black', y_range_name="foo", line_width=2)) for i in
+          figs[i].line('x', 'f' + str(i), source=cds, line_color='black', y_range_name="foo", line_width=1.3)) for i in
          range(8)]
 
 for f in figs:
@@ -103,8 +102,6 @@ def starter():
     for i in range(8):
         cds_data['value_' + str(i)] = features_data[i].values
 
-    #cds_feats.data = cds_data
-
 
 def update_test_charts(nd, sd, nfd, nfetd):
 
@@ -121,8 +118,7 @@ def update_test_charts(nd, sd, nfd, nfetd):
     if not test_phase:
         update_data = {'x': nfetd.index.get_level_values(0).values,
                        'y': nfetd.index.get_level_values(1).values}
-        print nfetd.index.get_level_values(0).values[0]
-        print nfetd.index.get_level_values(0).values[-1]
+
         for i in range(8):
             update_data['value_' + str(i)] = nfetd[i].values
 
@@ -154,7 +150,6 @@ def updater():
         if int(time.time()) - int(last_time) >= 1:
 
             # todo if process consumes more than 1 sec - alert
-
             last_time = time.time()
 
             nd = np.array(new_data)
@@ -170,6 +165,8 @@ def updater():
 
             # todo faster update via iloc
             features_data = features_data.append(new_features_data)
+
+            # todo call protocol here
             # update charts
             doc.add_next_tick_callback(partial(update_test_charts, nd=nd, sd=ses_data, nfd=new_filtered_data,
                                                nfetd=new_features_data))
@@ -180,6 +177,9 @@ def updater():
 
 
 # create layout
+# todo add stop button
+# todo add stage/forecast plot
+# todo add current accuracy
 update = Button(label="Start session")
 update.on_click(starter)
 inputs = widgetbox([update], width=200)
@@ -194,4 +194,4 @@ thread = Thread(target=updater)
 thread.daemon = True  # to end session properly when terminating main thread with ctrl+c
 thread.start()
 
-# todo log_id for headset data
+
