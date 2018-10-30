@@ -68,6 +68,7 @@ class Protocol:
 
     def fit(self, featurespace, just_score=False):
         # values - data, index - seconds
+        # todo exclude warm period
         extendend_states = self.states + [(time.time()*10, 'end')]
 
         cs = 0
