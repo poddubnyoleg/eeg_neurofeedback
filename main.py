@@ -1,6 +1,7 @@
 # import open_bci_connector
 import multiprocessing
 import feature_generation
+from protocol import Protocol
 from bokeh.models.sources import ColumnDataSource
 from bokeh.models import LinearColorMapper
 from bokeh.plotting import figure, curdoc
@@ -10,6 +11,7 @@ from bokeh.models import LinearAxis, Range1d
 from functools import partial
 from threading import Thread
 import pandas as pd
+
 
 import numpy as np
 import time
@@ -75,7 +77,6 @@ for f in figs_feats:
                     line_color=None, fill_color={'field': 'value_' + str(i), 'transform': mapper}) for i in range(8)]
 
 
-
 # init filters
 online_filters = [feature_generation.OnlineFilter(fs=250, notch_f0=50, notch_q=30, low_cut=1, high_cut=40, order=5) for
                   i in range(8)]
@@ -89,6 +90,7 @@ def starter():
     global test_phase
     global online_filters
     global features_data
+    global protocol
 
     test_phase = False
 
@@ -102,8 +104,12 @@ def starter():
     for i in range(8):
         cds_data['value_' + str(i)] = features_data[i].values
 
+    protocol = Protocol()
+
 
 def update_test_charts(nd, sd, nfd, nfetd):
+
+    global protocol
 
     lsd = len(sd)
 
@@ -123,6 +129,8 @@ def update_test_charts(nd, sd, nfd, nfetd):
             update_data['value_' + str(i)] = nfetd[i].values
 
         cds_feats.stream(update_data, len(nfetd.columns)*8*100)
+
+    protocol.evaluate(features_data, nfetd)
 
 
 ses_data = []
@@ -163,10 +171,9 @@ def updater():
             new_features_data = pd.DataFrame(new_filtered_data).groupby(8).apply(
                 lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
 
-            # todo faster update via iloc
-            features_data = features_data.append(new_features_data)
+            # todo faster update via iloc with indexes of df
+            features_data = features_data.combine_first(new_features_data)
 
-            # todo call protocol here
             # update charts
             doc.add_next_tick_callback(partial(update_test_charts, nd=nd, sd=ses_data, nfd=new_filtered_data,
                                                nfetd=new_features_data))
@@ -180,6 +187,7 @@ def updater():
 # todo add stop button
 # todo add stage/forecast plot
 # todo add current accuracy
+# todo add logging
 update = Button(label="Start session")
 update.on_click(starter)
 inputs = widgetbox([update], width=200)

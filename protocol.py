@@ -6,14 +6,24 @@ import time
 import sounddevice as sd
 import numpy as np
 from collections import deque
+import subprocess
+import multiprocessing
 
 
 class Protocol:
     # todo put parameters as init options
+
+    def alert(self, alert_type='switch'):
+        if alert_type=='switch':
+            audio_file = "sounds/switch.wav"
+        else:
+            audio_file = "sounds/big.wav"
+        subprocess.call(["afplay", audio_file])
+
     def __init__(self):
         self.warm_period = 5   # first seconds of new task to throw away from learning
 
-        # here we set alternating task with specified periods
+        # here we set alternating task with specified periods for initial calibration
         self.calibration_protocol = [(2*60, 'relax'),
                                      (2*60, 'target'),
                                      (2*60, 'relax'),
@@ -50,6 +60,12 @@ class Protocol:
         self.volume_averaging_array = deque([0]*3)
         self.sound_volume = 0
         sd.Stream(channels=2, callback=self.sound_callback)
+
+        # alert to start protocol
+
+        al = multiprocessing.Process(target=self.alert, args=('big',))
+        al.start()
+
 
     def change_volume(self, new_volume):
         self.volume_averaging_array.append(new_volume)
@@ -93,6 +109,8 @@ class Protocol:
         # feedback on feedback period - start relax, stop feedback
         # relax on relax period - fit, start feedback
 
+        # todo add sounds
+
         td = time.time() - self.current_feedback_state_start
         new_human_state = self.current_human_state
         new_feedback_state = self.current_feedback_state
@@ -127,7 +145,7 @@ class Protocol:
                 self.mute_sound()
             else:
                 self.change_volume(1 - self.clf.predict_proba(current_features.values)[
-                    list(self.clf.classes_).index('target')])
+                    list(self.clf.classes_).index('target')][0])
 
         if self.current_feedback_state == 'relax':
 
@@ -140,6 +158,9 @@ class Protocol:
 
         if (new_human_state != self.current_human_state) | (new_feedback_state != self.current_feedback_state):
             self.states.append((time.time(), new_human_state, new_feedback_state))
+
+            al = multiprocessing.Process(target=self.alert, args=('switch',))
+            al.start()
 
             if new_human_state != self.current_human_state:
                 self.current_human_state_start = time.time()
