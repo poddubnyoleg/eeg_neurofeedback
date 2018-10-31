@@ -130,7 +130,7 @@ def update_test_charts(nd, sd, nfd, nfetd):
 
         cds_feats.stream(update_data, len(nfetd.columns)*8*100)
 
-    protocol.evaluate(features_data, nfetd)
+        protocol.evaluate(features_data, nfetd)
 
 
 ses_data = []
@@ -171,8 +171,8 @@ def updater():
             new_features_data = pd.DataFrame(new_filtered_data).groupby(8).apply(
                 lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
 
-            # todo faster update via iloc with indexes of df
-            features_data = features_data.combine_first(new_features_data)
+            # todo faster update via iloc with indexes of df_
+            features_data = features_data.append(new_features_data)
 
             # update charts
             doc.add_next_tick_callback(partial(update_test_charts, nd=nd, sd=ses_data, nfd=new_filtered_data,
