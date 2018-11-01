@@ -11,7 +11,7 @@ from bokeh.models import LinearAxis, Range1d
 from functools import partial
 from threading import Thread
 import pandas as pd
-
+import sounddevice as sd
 
 import numpy as np
 import time
@@ -85,12 +85,24 @@ test_phase = True
 filtered_data = np.ndarray(shape=(0, 9))
 features_data = pd.DataFrame()
 
+# start feedback stream
+sound_volume = 0
+
+
+def sound_callback(indata, outdata, frames, time, status):
+    outdata[:] = np.random.rand(512, 2) * sound_volume
+
+
+stream = sd.Stream(channels=2, callback=sound_callback)
+stream.start()
+
 
 def starter():
     global test_phase
     global online_filters
     global features_data
     global protocol
+    global sound_volume
 
     test_phase = False
 
@@ -105,10 +117,10 @@ def starter():
         cds_data['value_' + str(i)] = features_data[i].values
 
     protocol = Protocol()
+    sound_volume = protocol.sound_volume
 
 
 def update_test_charts(nd, sd, nfd, nfetd):
-
     global protocol
 
     lsd = len(sd)
@@ -130,7 +142,7 @@ def update_test_charts(nd, sd, nfd, nfetd):
 
         cds_feats.stream(update_data, len(nfetd.columns)*8*100)
 
-        protocol.evaluate(features_data, nfetd)
+        #protocol.evaluate(features_data, nfetd)
 
 
 ses_data = []

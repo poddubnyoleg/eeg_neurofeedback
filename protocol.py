@@ -3,7 +3,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 import time
-import sounddevice as sd
 import numpy as np
 from collections import deque
 import subprocess
@@ -11,24 +10,49 @@ import multiprocessing
 
 
 class Protocol:
-    # todo put parameters as init options
 
     def alert(self, alert_type='switch'):
-        if alert_type=='switch':
-            audio_file = "sounds/switch.wav"
+        if alert_type == 'switch':
+            audio_file = "eeg_neurofeedback/sounds/switch.wav"
         else:
-            audio_file = "sounds/big.wav"
+            audio_file = "eeg_neurofeedback/sounds/big.wav"
         subprocess.call(["afplay", audio_file])
 
-    def __init__(self):
-        self.warm_period = 5   # first seconds of new task to throw away from learning
+    def change_volume(self, new_volume):
+        self.volume_averaging_array.append(new_volume)
+        self.volume_averaging_array.popleft()
+        self.sound_volume = np.mean(self.volume_averaging_array)
 
-        # here we set alternating task with specified periods for initial calibration
-        self.calibration_protocol = [(2*60, 'relax'),
-                                     (2*60, 'target'),
-                                     (2*60, 'relax'),
-                                     (2*60, 'target')
-                                     ]
+    def mute_sound(self):
+        self.volume_averaging_array = deque([0] * 3)
+        self.sound_volume = np.mean(self.volume_averaging_array)
+
+    '''
+    Protocol settings:
+    
+    warm_period - first seconds of new task to throw away from learning
+    calibration_protocol - here we set alternating task with specified periods for initial calibration
+    feedback_period - passing feedback after calibration
+    relax_period - relax after successful feedback session
+    recalibration_period - at this point of feedback session check prediction accuracy
+    recalibration_accuracy - at least prediction accuracy for feedback session to continue
+    '''
+
+    def __init__(self,
+                 warm_period=5,
+                 calibration_protocol=((2*60, 'relax'),
+                                       (2*60, 'target'),
+                                       (2*60, 'relax'),
+                                       (2*60, 'target')),
+                 feedback_period=10 * 60,
+                 relax_period=2 * 60,
+                 recalibration_period=5 * 60,
+                 recalibration_accuracy=0.7
+                 ):
+
+        self.warm_period = warm_period
+        self.calibration_protocol = calibration_protocol
+
         # remap calibration_protocol for time started
         self.run_calibration_protocol = []
         st = 0
@@ -36,11 +60,11 @@ class Protocol:
             self.run_calibration_protocol.append((st, i[1]))
             st += i[0]
 
-        self.feedback_period = 10*60    # passing feedback after calibration
-        self.relax_period = 2*60        # relax after successful feedback session
+        self.feedback_period = feedback_period
+        self.relax_period = relax_period
 
-        self.recalibration_period = 5*60  # at this point of feedback session check prediction accuracy
-        self.recalibration_accuracy = 0.7  # at least prediction accuracy for feedback session to continue
+        self.recalibration_period = recalibration_period
+        self.recalibration_accuracy = recalibration_accuracy
 
         # init models for machine learning
         self.estimators = [('reduce_dim', PCA(n_components=35)),
@@ -58,43 +82,25 @@ class Protocol:
 
         # feedback sound processing
         self.volume_averaging_array = deque([0]*3)
-        self.sound_volume = 0
-        sd.Stream(channels=2, callback=self.sound_callback)
+        self.sound_volume = 0.5
 
         # alert to start protocol
-
         al = multiprocessing.Process(target=self.alert, args=('big',))
         al.start()
-
-
-    def change_volume(self, new_volume):
-        self.volume_averaging_array.append(new_volume)
-        self.volume_averaging_array.popleft()
-        self.sound_volume = np.mean(self.volume_averaging_array)
-
-    def mute_sound(self):
-        self.volume_averaging_array = deque([0] * 3)
-        self.sound_volume = np.mean(self.volume_averaging_array)
-
-    def sound_callback(self, indata, outdata, frames, time, status):
-
-        if status:
-            print(status)
-        outdata[:] = np.random.rand(512, 2) * self.sound_volume
 
     def fit(self, featurespace, just_score=False):
         # values - data, index - seconds
         # todo exclude warm period
-        extendend_states = self.states + [(time.time()*10, 'end')]
+        extended_states = self.states + [(time.time()*10, 'end')]
 
         cs = 0
         y = []
 
         for s in featurespace.index.values:
-            if s >= extendend_states[cs+1][0]:
+            if s >= extended_states[cs+1][0]:
                 cs += 1
 
-            y.append(extendend_states[cs][1])
+            y.append(extended_states[cs][1])
 
         if just_score:
             return self.clf.score(featurespace, y)
@@ -103,13 +109,15 @@ class Protocol:
 
     def evaluate(self, featurespace, current_features):
 
-        # calibration ongoing - continue
-        # calibration ends - fit, start feedback with sound
-        # feedback on recalibration_period - check accuracy, if low - start calibration
-        # feedback on feedback period - start relax, stop feedback
-        # relax on relax period - fit, start feedback
+        """
+        Protocol states and actions:
 
-        # todo add sounds
+        calibration ongoing - continue
+        calibration ends - fit, start feedback with sound
+        feedback on recalibration_period - check accuracy, if low - start calibration
+        feedback on feedback period - start relax, stop feedback
+        relax on relax period - fit, start feedback
+        """
 
         td = time.time() - self.current_feedback_state_start
         new_human_state = self.current_human_state
