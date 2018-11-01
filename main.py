@@ -116,12 +116,22 @@ def starter():
     for i in range(8):
         cds_data['value_' + str(i)] = features_data[i].values
 
-    protocol = Protocol()
+    protocol = Protocol(warm_period=5,
+                        calibration_protocol=((5, 'relax'),
+                                              (5, 'target'),
+                                              (5, 'relax'),
+                                              (5, 'target')),
+                        feedback_period=10,
+                        relax_period=5,
+                        recalibration_period=5,
+                        recalibration_accuracy=0.7)
+
     sound_volume = protocol.sound_volume
 
 
 def update_test_charts(nd, sd, nfd, nfetd):
     global protocol
+    global sound_volume
 
     lsd = len(sd)
 
@@ -142,7 +152,8 @@ def update_test_charts(nd, sd, nfd, nfetd):
 
         cds_feats.stream(update_data, len(nfetd.columns)*8*100)
 
-        #protocol.evaluate(features_data, nfetd)
+        protocol.evaluate(features_data, nfetd)
+        sound_volume = protocol.sound_volume
 
 
 ses_data = []
@@ -154,7 +165,6 @@ p.start()
 def updater():
     global filtered_data
     global features_data
-    time.sleep(3)  # wait till tornado settles to avoid data mess
 
     last_time = time.time()
     new_data = []
@@ -170,7 +180,7 @@ def updater():
         if int(time.time()) - int(last_time) >= 1:
 
             # todo if process consumes more than 1 sec - alert
-            last_time = time.time()
+            t = time.time()
 
             nd = np.array(new_data)
 
@@ -179,8 +189,10 @@ def updater():
                                                      for i in range(8)]).T, nd[:, 9][:, None]])
             filtered_data = np.append(filtered_data, new_filtered_data, axis=0)
 
-            # get features of current second
-            new_features_data = pd.DataFrame(new_filtered_data).groupby(8).apply(
+            # get features of last full second
+
+            new_features_data = pd.DataFrame(filtered_data[np.where(filtered_data[:, 8] == int(last_time))]
+                                             ).groupby(8).apply(
                 lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
 
             # todo faster update via iloc with indexes of df_
@@ -191,6 +203,7 @@ def updater():
                                                nfetd=new_features_data))
 
             new_data = []
+            last_time = t
 
         time.sleep(0.001)
 

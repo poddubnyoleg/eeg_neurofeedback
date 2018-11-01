@@ -82,7 +82,7 @@ class Protocol:
 
         # feedback sound processing
         self.volume_averaging_array = deque([0]*3)
-        self.sound_volume = 0.5
+        self.sound_volume = 0
 
         # alert to start protocol
         al = multiprocessing.Process(target=self.alert, args=('big',))
@@ -92,7 +92,7 @@ class Protocol:
         # values - data, index - seconds
         # todo exclude warm period
         extended_states = self.states + [(time.time()*10, 'end')]
-
+        featurespace = featurespace.unstack()
         cs = 0
         y = []
 
@@ -103,9 +103,9 @@ class Protocol:
             y.append(extended_states[cs][1])
 
         if just_score:
-            return self.clf.score(featurespace, y)
+            return self.clf.score(featurespace.values, y)
         else:
-            self.clf.fit(featurespace, y)
+            self.clf.fit(featurespace.values, y)
 
     def evaluate(self, featurespace, current_features):
 
@@ -118,7 +118,6 @@ class Protocol:
         feedback on feedback period - start relax, stop feedback
         relax on relax period - fit, start feedback
         """
-
         td = time.time() - self.current_feedback_state_start
         new_human_state = self.current_human_state
         new_feedback_state = self.current_feedback_state
@@ -138,22 +137,24 @@ class Protocol:
             elif td >= self.run_calibration_protocol[-1][0]+self.calibration_protocol[-1][0]:
                 new_feedback_state = 'feedback'
                 new_human_state = 'target'
+                self.fit(featurespace)
 
         if self.current_feedback_state == 'feedback':
 
-            score = self.fit(featurespace, just_score=True)
-
-            if (td >= self.recalibration_period) & (td < self.feedback_period) & (score < self.recalibration_accuracy):
-                new_human_state = self.calibration_protocol[0][1]
-                new_feedback_state = 'calibration'
+            if (td >= self.recalibration_period) & (td < self.feedback_period):
+                score = self.fit(featurespace, just_score=True)
+                if score < self.recalibration_accuracy:
+                    new_human_state = self.calibration_protocol[0][1]
+                    new_feedback_state = 'calibration'
+                    self.mute_sound()
 
             elif td >= self.feedback_period:
                 new_human_state = 'relax'
                 new_feedback_state = 'relax'
                 self.mute_sound()
             else:
-                self.change_volume(1 - self.clf.predict_proba(current_features.values)[
-                    list(self.clf.classes_).index('target')][0])
+                self.change_volume(1 - self.clf.predict_proba(current_features.unstack().values)[0][
+                    list(self.clf.classes_).index('target')])
 
         if self.current_feedback_state == 'relax':
 
