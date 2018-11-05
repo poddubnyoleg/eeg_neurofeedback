@@ -7,15 +7,18 @@ from bokeh.models import LinearColorMapper
 from bokeh.plotting import figure, curdoc
 from bokeh.layouts import row, column, widgetbox
 from bokeh.models.widgets import TextInput, Button
+from bokeh.models.glyphs import Text
 from bokeh.models import LinearAxis, Range1d
 from functools import partial
 from threading import Thread
 import pandas as pd
 import sounddevice as sd
+import csv
 
 import numpy as np
 import time
 
+# todo put in script parameter
 fake_data = True
 
 if fake_data:
@@ -76,6 +79,21 @@ for f in figs_feats:
 [figs_feats[i].rect(x="x", y="y", width=1, height=1, source=cds_feats,
                     line_color=None, fill_color={'field': 'value_' + str(i), 'transform': mapper}) for i in range(8)]
 
+# create figure for forecast and status
+forecast_status_cds = ColumnDataSource(data={'x': [],
+                                             'stage': [],
+                                             'prediction': []})
+forecast_status_figure = figure(plot_width=300, plot_height=100, toolbar_location=None)
+forecast_status_figure.line('x', 'stage', source=forecast_status_cds, line_color='red', line_alpha=0.5)
+forecast_status_figure.line('x', 'prediction', source=forecast_status_cds, line_color='black')
+forecast_status_figure.axis.visible = False
+
+# figure for status
+status_text_cds = ColumnDataSource(data={'x': [0], 'y': [0], 'text': ['Calibration']})
+status_text_figure = figure(plot_width=300, plot_height=100, toolbar_location=None)
+status_text_figure.axis.visible = False
+status_text = Text(x="x", y="y", text="text", text_color='black')
+status_text_figure.add_glyph(status_text_cds, status_text)
 
 # init filters
 online_filters = [feature_generation.OnlineFilter(fs=250, notch_f0=50, notch_q=30, low_cut=1, high_cut=40, order=5) for
@@ -155,11 +173,34 @@ def update_test_charts(nd, sd, nfd, nfetd):
         protocol.evaluate(features_data, nfetd)
         sound_volume = protocol.sound_volume
 
+        # update feedback status chart
+        if protocol.current_human_state == 'target':
+            stage = 1
+        else:
+            stage = 0
+
+        if (protocol.current_human_state == 'target') & (protocol.current_feedback_state == 'feedback'):
+            prediction = protocol.current_prediction
+        else:
+            prediction = 0
+
+        forecast_status_cds.stream({'x': [int(time.time())-1], 'stage': [stage], 'prediction': [prediction]}, 1000)
+
+        # update current accuracy
+        if protocol.current_feedback_state == 'calibration':
+            status_text_cds.stream({'x': [0], 'y': [0], 'text': ['calibration']}, 1)
+        else:
+            status_text_cds.stream({'x': [0], 'y': [0], 'text': ['feedback (accuracy ' +
+                                                                 str(round(protocol.current_accuracy, 3))]}, 1)
+
 
 ses_data = []
 q = multiprocessing.Queue()
 p = multiprocessing.Process(target=streaming)
 p.start()
+
+# logging init
+raw_data_writer = csv.writer(open('raw_data.csv', 'wb'), delimiter=';')
 
 
 def updater():
@@ -176,6 +217,8 @@ def updater():
 
             new_data.append(new_q)
             ses_data.append(new_q)
+
+            raw_data_writer.writerow(new_q)
 
         if int(time.time()) - int(last_time) >= 1:
 
@@ -210,17 +253,16 @@ def updater():
 
 # create layout
 # todo add stop button
-# todo add stage/forecast plot
-# todo add current accuracy
 # todo add logging
 update = Button(label="Start session")
 update.on_click(starter)
-inputs = widgetbox([update], width=200)
+inputs = widgetbox([update], width=300)
 
 doc = curdoc()
 
 layout = column(row(figs[0:2] + figs_feats[0:2]), row(figs[2:4] + figs_feats[2:4]),
-                row(figs[4:6] + figs_feats[4:6]), row(figs[6:]+figs_feats[6:]), inputs)
+                row(figs[4:6] + figs_feats[4:6]), row(figs[6:]+figs_feats[6:]),
+                row(inputs, status_text_figure, forecast_status_figure))
 doc.add_root(layout)
 
 thread = Thread(target=updater)

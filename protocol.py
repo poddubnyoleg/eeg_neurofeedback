@@ -18,6 +18,7 @@ class Protocol:
             audio_file = "eeg_neurofeedback/sounds/big.wav"
         subprocess.call(["afplay", audio_file])
 
+    # todo create smooth changer
     def change_volume(self, new_volume):
         self.volume_averaging_array.append(new_volume)
         self.volume_averaging_array.popleft()
@@ -83,6 +84,9 @@ class Protocol:
         # feedback sound processing
         self.volume_averaging_array = deque([0]*3)
         self.sound_volume = 0
+        self.current_prediction = 0
+
+        self.current_accuracy = 0
 
         # alert to start protocol
         al = multiprocessing.Process(target=self.alert, args=('big',))
@@ -106,6 +110,7 @@ class Protocol:
             return self.clf.score(featurespace.values, y)
         else:
             self.clf.fit(featurespace.values, y)
+            return self.clf.score(featurespace.values, y)
 
     def evaluate(self, featurespace, current_features):
 
@@ -137,10 +142,11 @@ class Protocol:
             elif td >= self.run_calibration_protocol[-1][0]+self.calibration_protocol[-1][0]:
                 new_feedback_state = 'feedback'
                 new_human_state = 'target'
-                self.fit(featurespace)
+                self.current_accuracy = self.fit(featurespace)
 
         if self.current_feedback_state == 'feedback':
 
+            # todo check accuracy on last feedback period
             if (td >= self.recalibration_period) & (td < self.feedback_period):
                 score = self.fit(featurespace, just_score=True)
                 if score < self.recalibration_accuracy:
@@ -153,8 +159,11 @@ class Protocol:
                 new_feedback_state = 'relax'
                 self.mute_sound()
             else:
-                self.change_volume(1 - self.clf.predict_proba(current_features.unstack().values)[0][
-                    list(self.clf.classes_).index('target')])
+
+                self.current_prediction = self.clf.predict_proba(current_features.unstack().values)[0][
+                    list(self.clf.classes_).index('target')]
+
+                self.change_volume(1-self.current_prediction)
 
         if self.current_feedback_state == 'relax':
 
