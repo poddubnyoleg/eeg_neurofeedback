@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -11,7 +12,8 @@ import multiprocessing
 
 class Protocol:
 
-    def alert(self, alert_type='switch'):
+    @staticmethod
+    def alert(alert_type='switch'):
         if alert_type == 'switch':
             audio_file = "eeg_neurofeedback/sounds/switch.wav"
         else:
@@ -82,7 +84,8 @@ class Protocol:
         self.states = []
 
         # feedback sound processing
-        self.volume_averaging_array = deque([0]*3)
+        self.volume_window = 1
+        self.volume_averaging_array = deque([0]*self.volume_window)
         self.sound_volume = 0
         self.current_prediction = 0
 
@@ -97,9 +100,13 @@ class Protocol:
         # todo exclude warm period
         extended_states = self.states + [(time.time()*10, 'end')]
         featurespace = featurespace.unstack()
+
+        # filter featurespace with start session time
+        featurespace = featurespace[featurespace.index.values >= extended_states[0][0]]
         cs = 0
         y = []
 
+        # todo simplify iteration
         for s in featurespace.index.values:
             if s >= extended_states[cs+1][0]:
                 cs += 1

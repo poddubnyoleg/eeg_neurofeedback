@@ -1,14 +1,9 @@
-# import open_bci_connector
-import multiprocessing
+# -*- coding: utf-8 -*-
+
+
 import feature_generation
 from protocol import Protocol
-from bokeh.models.sources import ColumnDataSource
-from bokeh.models import LinearColorMapper
-from bokeh.plotting import figure, curdoc
-from bokeh.layouts import row, column, widgetbox
-from bokeh.models.widgets import TextInput, Button
-from bokeh.models.glyphs import Text
-from bokeh.models import LinearAxis, Range1d
+
 from functools import partial
 from threading import Thread
 import pandas as pd
@@ -17,83 +12,13 @@ import csv
 
 import numpy as np
 import time
-
-# todo put in script parameter
-fake_data = True
-
-if fake_data:
-
-    def handle_sample():
-        global q
-        q.put([np.random.rand() for r in range(8)] + [time.time()] + [int(time.time())])
+import bokeh_visuals
+import helmet
 
 
-    def streaming():
-        while True:
-            handle_sample()
-            time.sleep(0.01)
-else:
+my_helmet = helmet.Helmet(helmet_type='fake')
+visuals = bokeh_visuals.BokehVisuals()
 
-    def handle_sample(sample):
-        global q
-        q.put(sample.channel_data + [time.time()] + [sample.id])
-        # todo log_id for headset data
-
-    def streaming():
-        open_bci_connector.board.start_streaming(handle_sample)
-
-
-# todo add port selector for real data
-# create charts for testing headset
-figs = [figure(plot_width=300, plot_height=100, toolbar_location=None) for i in range(8)]
-for f in figs:
-    f.extra_y_ranges = {"foo": Range1d(start=-1, end=1)}
-
-[f.add_layout(LinearAxis(y_range_name="foo"), 'right') for f in figs]
-
-cds = ColumnDataSource(data={i: [] for i in [item for sublist in
-                                             [['y' + str(i), 'f' + str(i)] for i in range(8)] for item in sublist] +
-                             ['x']})
-
-lines = [(figs[i].line('x', 'y' + str(i), source=cds, line_alpha=0.3),
-          figs[i].line('x', 'f' + str(i), source=cds, line_color='black', y_range_name="foo", line_width=1.3)) for i in
-         range(8)]
-
-for f in figs:
-    f.axis.visible = False
-
-# create charts for visualising features
-cds_feats_data = {'x': [],
-                  'y': []}
-for i in range(8):
-    cds_feats_data['value_' + str(i)] = []
-
-cds_feats = ColumnDataSource(data=cds_feats_data)
-
-colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-mapper = LinearColorMapper(palette=colors, low=-5, high=5)
-
-figs_feats = [figure(plot_width=300, plot_height=100, toolbar_location=None) for i in range(8)]
-for f in figs_feats:
-    f.axis.visible = False
-[figs_feats[i].rect(x="x", y="y", width=1, height=1, source=cds_feats,
-                    line_color=None, fill_color={'field': 'value_' + str(i), 'transform': mapper}) for i in range(8)]
-
-# create figure for forecast and status
-forecast_status_cds = ColumnDataSource(data={'x': [],
-                                             'stage': [],
-                                             'prediction': []})
-forecast_status_figure = figure(plot_width=300, plot_height=100, toolbar_location=None)
-forecast_status_figure.line('x', 'stage', source=forecast_status_cds, line_color='red', line_alpha=0.5)
-forecast_status_figure.line('x', 'prediction', source=forecast_status_cds, line_color='black')
-forecast_status_figure.axis.visible = False
-
-# figure for status
-status_text_cds = ColumnDataSource(data={'x': [0], 'y': [0], 'text': ['Calibration']})
-status_text_figure = figure(plot_width=300, plot_height=100, toolbar_location=None)
-status_text_figure.axis.visible = False
-status_text = Text(x="x", y="y", text="text", text_color='black')
-status_text_figure.add_glyph(status_text_cds, status_text)
 
 # init filters
 online_filters = [feature_generation.OnlineFilter(fs=250, notch_f0=50, notch_q=30, low_cut=1, high_cut=40, order=5) for
@@ -105,7 +30,6 @@ features_data = pd.DataFrame()
 
 # start feedback stream
 sound_volume = 0
-
 
 def sound_callback(indata, outdata, frames, time, status):
     outdata[:] = np.random.rand(512, 2) * sound_volume
@@ -135,13 +59,13 @@ def starter():
         cds_data['value_' + str(i)] = features_data[i].values
 
     protocol = Protocol(warm_period=5,
-                        calibration_protocol=((5, 'relax'),
-                                              (5, 'target'),
-                                              (5, 'relax'),
-                                              (5, 'target')),
-                        feedback_period=10,
-                        relax_period=5,
-                        recalibration_period=5,
+                        calibration_protocol=((30, 'relax'),
+                                              (30, 'target'),
+                                              (30, 'relax'),
+                                              (30, 'target')),
+                        feedback_period=100,
+                        relax_period=50,
+                        recalibration_period=50,
                         recalibration_accuracy=0.7)
 
     sound_volume = protocol.sound_volume
@@ -159,7 +83,7 @@ def update_test_charts(nd, sd, nfd, nfetd):
         update_data['f' + str(i)] = nfd[:, i]
         update_data['y' + str(i)] = nd[:, i]
 
-    cds.stream(update_data, 300)
+    cds.stream(update_data, 1000)
 
     if not test_phase:
         update_data = {'x': nfetd.index.get_level_values(0).values,
@@ -168,7 +92,7 @@ def update_test_charts(nd, sd, nfd, nfetd):
         for i in range(8):
             update_data['value_' + str(i)] = nfetd[i].values
 
-        cds_feats.stream(update_data, len(nfetd.columns)*8*100)
+        cds_feats.stream(update_data, len(nfetd.columns)*8*1000)
 
         protocol.evaluate(features_data, nfetd)
         sound_volume = protocol.sound_volume
@@ -195,9 +119,8 @@ def update_test_charts(nd, sd, nfd, nfetd):
 
 
 ses_data = []
-q = multiprocessing.Queue()
-p = multiprocessing.Process(target=streaming)
-p.start()
+
+my_helmet.start_stream()
 
 # logging init
 raw_data_writer = csv.writer(open('raw_data.csv', 'wb'), delimiter=';')
@@ -239,8 +162,8 @@ def updater():
                 lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
 
             # todo faster update via iloc with indexes of df_
+            # todo start creating features since session start
             features_data = features_data.append(new_features_data)
-
             # update charts
             doc.add_next_tick_callback(partial(update_test_charts, nd=nd, sd=ses_data, nfd=new_filtered_data,
                                                nfetd=new_features_data))
@@ -248,22 +171,13 @@ def updater():
             new_data = []
             last_time = t
 
-        time.sleep(0.001)
+        time.sleep(0.01)
 
 
-# create layout
-# todo add stop button
-# todo add logging
-update = Button(label="Start session")
-update.on_click(starter)
-inputs = widgetbox([update], width=300)
 
-doc = curdoc()
 
-layout = column(row(figs[0:2] + figs_feats[0:2]), row(figs[2:4] + figs_feats[2:4]),
-                row(figs[4:6] + figs_feats[4:6]), row(figs[6:]+figs_feats[6:]),
-                row(inputs, status_text_figure, forecast_status_figure))
-doc.add_root(layout)
+visuals.button_link(feedback_service.start)
+visuals.add_layout()
 
 thread = Thread(target=updater)
 thread.daemon = True  # to end session properly when terminating main thread with ctrl+c
