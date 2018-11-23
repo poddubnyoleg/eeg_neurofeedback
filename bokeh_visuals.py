@@ -91,3 +91,9 @@ class BokehVisuals:
                         row(widgetbox([self.update_button], width=200), self.status_text_figure,
                             self.forecast_status_figure))
         self.doc.add_root(layout)
+
+    def update_tuning(self):
+        pass
+
+    def update_protocol(self):
+        pass
