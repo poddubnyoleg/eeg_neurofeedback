@@ -9,6 +9,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 import time
+import subprocess
+import multiprocessing
 
 
 class PhysicalFeedback:
@@ -20,6 +22,15 @@ class PhysicalFeedback:
         self.sound_volume = 0
         stream = sd.Stream(channels=2, callback=self.sound_callback)
         stream.start()
+
+
+def alert(alert_type='switch'):
+    if alert_type == 'switch':
+        audio_file = "eeg_neurofeedback/sounds/switch.wav"
+    else:
+        audio_file = "eeg_neurofeedback/sounds/big.wav"
+    p1 = multiprocessing.Process(target=subprocess.call, args=(["afplay", audio_file],))
+    p1.start()
 
 
 def get_data(helmet):
@@ -70,7 +81,8 @@ class TuningState:
                                     ml=MachineLearning(),
                                     states_history=[],
                                     calibration_iter=1,
-                                    last_time_run=time.time()
+                                    last_time_run=time.time(),
+                                    logger=(csv.writer(open('raw_data.csv', 'wb'), delimiter=';'))
                                     )
         return self
 
@@ -83,10 +95,10 @@ class MachineLearning:
                       ('clf', SVC(probability=True, kernel='sigmoid', C=0.1, gamma=0.1))]
         self.clf = Pipeline(estimators)
 
-    def fit(self, featurespace, just_score=False):
+    def fit(self, featurespace, states_history, just_score=False):
         # values - data, index - seconds
         # todo exclude warm period
-        extended_states = self.states + [(time.time() * 10, 'end')]
+        extended_states = states_history + [(time.time() * 10, 'end')]
         featurespace = featurespace.unstack()
 
         # filter featurespace with start session time
@@ -108,11 +120,12 @@ class MachineLearning:
             return self.clf.score(featurespace.values, y)
 
 
+# todo add logger
 class ProtocolCommonState:
 
     def __init__(self, helmet, visuals, online_filters, physical_feedback, protocol_params,
                  filtered_data, features_data, ml, states_history, calibration_iter,
-                 last_time_run):
+                 last_time_run, logger):
         self.helmet = helmet,
         self.visuals = visuals,
         self.online_filters = online_filters
@@ -125,6 +138,9 @@ class ProtocolCommonState:
         self.state_start = time.time()
         self.calibration_iter = calibration_iter
         self.last_time_run = last_time_run
+        self.new_features_data = pd.DataFrame()
+        self.logger = logger
+        self.current_prediction = 0
 
         self.params_to_pass = dict(helmet=self.helmet,
                                    visuals=self.visuals,
@@ -136,25 +152,44 @@ class ProtocolCommonState:
                                    ml=self.ml,
                                    states_history=self.states_history,
                                    calibration_iter=self.calibration_iter,
-                                   last_time_run=self.last_time_run
+                                   last_time_run=self.last_time_run,
+                                   logger=self.logger
                                    )
 
+        self.human_state_mapper = {
+            'CalibrationRelax': ['relax', 'calibration'],
+            'CalibrationTarget': ['target', 'calibration'],
+            'FeedbackTarget': ['target', 'feedback'],
+            'FeedbackRelax': ['relax', 'feedback']
+        }
+
+        self.states_history.append([self.state_start] + self.human_state_mapper[self.__class__.__name__])
+
+        alert('switch')
+
     def update_data_charts(self):
-        new_data = np.array(get_data(self.helmet))
+
+        new_q = get_data(self.helmet)
+
+        self.logger[0].writerow(new_q)
+
+        new_data = np.array(new_q)
         # [:,None] - to make arrays the same shape for hstack
         new_filtered_data = np.hstack([np.array([self.online_filters[i].filter(new_data[:, i])
                                                  for i in range(8)]).T, new_data[:, 9][:, None]])
         self.filtered_data = np.append(self.filtered_data, new_filtered_data, axis=0)
-        new_features_data = pd.DataFrame(
+        self.new_features_data = pd.DataFrame(
             self.filtered_data[(np.where(self.filtered_data[:, 8] > int(self.last_time_run) - 1)) &
                                (np.where(self.filtered_data[:, 8] <= int(time.time()) - 1))]
             ).groupby(8).apply(
             lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
 
-        self.features_data = self.features_data.append(new_features_data)
+        self.features_data = self.features_data.append(self.new_features_data)
 
         self.visuals.update_tuning(new_data, new_filtered_data, self.filtered_data)
-        self.visuals.update_protocol(new_data)
+        self.visuals.update_protocol(self.new_features_data,
+                                     self.human_state_mapper[self.__class__.__name__],
+                                     self.current_prediction)
 
 
 class CalibrationRelax(ProtocolCommonState):
@@ -178,20 +213,45 @@ class CalibrationTarget(ProtocolCommonState):
                 self.calibration_iter += 1
                 return CalibrationRelax(**self.params_to_pass)
             else:
+                self.calibration_iter = 1
+                self.ml.fit(self.features_data, self.states_history, just_score=False)
                 return FeedbackTarget(**self.params_to_pass)
+        return self
+
+
+class FeedbackTarget(ProtocolCommonState):
+
+    def run(self):
+        self.update_data_charts()
+        self.last_time_run = time.time()
+
+        if self.last_time_run - self.state_start == self.protocol_params['recalibration_period']:
+            # todo check accuracy on last feedback period
+            score = self.ml.fit(self.features_data, self.states_history, just_score=True)
+            if score < self.protocol_params['recalibration_accuracy']:
+                self.physical_feedback.sound_volume = 0
+                return CalibrationRelax(**self.params_to_pass)
+
+        elif self.last_time_run - self.state_start > self.protocol_params['feedback_period']:
+            self.physical_feedback.sound_volume = 0
+            return FeedbackRelax(**self.params_to_pass)
+
+        self.current_prediction = self.ml.clf.predict_proba(
+            self.new_features_data.unstack().values)[0][list(self.ml.clf.classes_).index('target')]
+        self.physical_feedback.sound_volume = (1 - self.current_prediction)
+
         return self
 
 
 class FeedbackRelax(ProtocolCommonState):
 
     def run(self):
-        pass
+        self.update_data_charts()
+        self.last_time_run = time.time()
 
-
-class FeedbackTarget(ProtocolCommonState):
-
-    def run(self):
-        pass
+        if self.last_time_run - self.state_start > self.protocol_params['relax_period']:
+            self.ml.fit(self.features_data, self.states_history, just_score=False)
+            return FeedbackTarget(**self.params_to_pass)
 
 
 class Application:

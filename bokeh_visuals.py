@@ -6,6 +6,8 @@ from bokeh.layouts import row, column, widgetbox
 from bokeh.models.widgets import TextInput, Button
 from bokeh.models import LinearAxis, Range1d
 from bokeh.models.glyphs import Text
+import numpy as np
+import time
 
 
 class BokehVisuals:
@@ -22,14 +24,15 @@ class BokehVisuals:
         [f.add_layout(LinearAxis(y_range_name="foo"), 'right') for f in self.figs]
 
         self.cds = ColumnDataSource(data={i: [] for i in [item for sublist in
-                                                     [['y' + str(i), 'f' + str(i)] for i in range(8)] for item in
-                                                     sublist] +
-                                     ['x']})
+                                                          [['y' + str(i), 'f' + str(i)] for i in range(8)] for item in
+                                                          sublist] +
+                                          ['x']})
 
-        lines = [(self.figs[i].line('x', 'y' + str(i), source=self.cds, line_alpha=0.3),
-                  self.figs[i].line('x', 'f' + str(i), source=self.cds, line_color='red', y_range_name="foo", line_width=1)) for i
-                 in
-                 range(8)]
+        [(self.figs[i].line('x', 'y' + str(i), source=self.cds, line_alpha=0.3),
+          self.figs[i].line('x', 'f' + str(i), source=self.cds, line_color='red', y_range_name="foo", line_width=1)) for
+         i
+         in
+         range(8)]
 
         for f in self.figs:
             f.axis.visible = False
@@ -54,15 +57,16 @@ class BokehVisuals:
             f.ygrid.grid_line_color = None
 
         [self.figs_feats[i].rect(x="x", y="y", width=1, height=1, source=self.cds_feats,
-                            line_color=None, fill_color={'field': 'value_' + str(i), 'transform': mapper}) for i in
+                                 line_color=None, fill_color={'field': 'value_' + str(i), 'transform': mapper}) for i in
          range(8)]
 
         # create figure for forecast and status
         self.forecast_status_cds = ColumnDataSource(data={'x': [],
-                                                     'stage': [],
-                                                     'prediction': []})
+                                                          'stage': [],
+                                                          'prediction': []})
         self.forecast_status_figure = figure(plot_width=400, plot_height=100, toolbar_location=None)
-        self.forecast_status_figure.line('x', 'stage', source=self.forecast_status_cds, line_color='red', line_alpha=0.5)
+        self.forecast_status_figure.line('x', 'stage', source=self.forecast_status_cds, line_color='red',
+                                         line_alpha=0.5)
         self.forecast_status_figure.line('x', 'prediction', source=self.forecast_status_cds, line_color='black')
         self.forecast_status_figure.axis.visible = False
         self.forecast_status_figure.xgrid.grid_line_color = None
@@ -92,8 +96,37 @@ class BokehVisuals:
                             self.forecast_status_figure))
         self.doc.add_root(layout)
 
-    def update_tuning(self):
-        pass
+    # todo updates
+    # self.visuals.update_tuning(new_data, new_filtered_data, self.filtered_data)
+    # self.visuals.update_protocol(self.new_features_data)
+    def update_tuning(self, new_data, new_filtered_data, filtered_data):
+        lsd = len(filtered_data)
+        update_data = {'x': np.arange(lsd - len(new_data[:, 0]), lsd, 1)}
 
-    def update_protocol(self):
-        pass
+        for i in range(8):
+            update_data['f' + str(i)] = new_filtered_data[:, i]
+            update_data['y' + str(i)] = new_data[:, i]
+
+        self.cds.stream(update_data, 1000)
+
+    def update_protocol(self, new_features_data, current_state, current_prediction):
+        update_data = {'x': new_features_data.index.get_level_values(0).values,
+                       'y': new_features_data.index.get_level_values(1).values}
+
+        for i in range(8):
+            update_data['value_' + str(i)] = new_features_data[i].values
+
+        self.cds_feats.stream(update_data, len(new_features_data.columns) * 8 * 1000)
+
+        if current_state[0] == 'target':
+            stage = 1
+        else:
+            stage = 0
+
+        self.forecast_status_cds.stream({'x': [int(time.time()) - 1], 'stage': [stage],
+                                         'prediction': [current_prediction]}, 1000)
+
+        if current_state[1] == 'calibration':
+            self.status_text_cds.stream({'x': [0], 'y': [0], 'text': ['calibration']}, 1)
+        else:
+            self.status_text_cds.stream({'x': [0], 'y': [0], 'text': ['feedback']}, 1)
