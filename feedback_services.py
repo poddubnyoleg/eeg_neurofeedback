@@ -20,8 +20,8 @@ class PhysicalFeedback:
 
     def __init__(self):
         self.sound_volume = 0
-        stream = sd.Stream(channels=2, callback=self.sound_callback)
-        stream.start()
+        self.stream = sd.Stream(channels=2, callback=self.sound_callback)
+        self.stream.start()
 
 
 def alert(alert_type='switch'):
@@ -31,13 +31,6 @@ def alert(alert_type='switch'):
         audio_file = "eeg_neurofeedback/sounds/big.wav"
     p1 = multiprocessing.Process(target=subprocess.call, args=(["afplay", audio_file],))
     p1.start()
-
-
-def get_data(helmet):
-    new_data = []
-    while not helmet.q.empty():
-        new_data.append(helmet.q.get())
-    return new_data
 
 
 class TuningState:
@@ -62,7 +55,7 @@ class TuningState:
         self.filtered_data = np.ndarray(shape=(0, 9))
 
     def run(self):
-        new_data = np.array(get_data(self.helmet))
+        new_data = np.array(self.helmet.get_data())
         # [:,None] - to make arrays the same shape for hstack
         new_filtered_data = np.hstack([np.array([self.online_filters[i].filter(new_data[:, i])
                                                  for i in range(8)]).T, new_data[:, 9][:, None]])
@@ -70,7 +63,7 @@ class TuningState:
 
         self.visuals.update_tuning(new_data, new_filtered_data, self.filtered_data)
 
-        if ~self.tuning_phase:
+        if not self.tuning_phase:
             return CalibrationRelax(helmet=self.helmet,
                                     visuals=self.visuals,
                                     online_filters=self.online_filters,
@@ -82,7 +75,7 @@ class TuningState:
                                     states_history=[],
                                     calibration_iter=1,
                                     last_time_run=time.time(),
-                                    logger=(csv.writer(open('raw_data.csv', 'wb'), delimiter=';'))
+                                    logger=(csv.writer(open('raw_data.csv', 'wb'), delimiter=';'),)
                                     )
         return self
 
@@ -101,7 +94,6 @@ class MachineLearning:
         extended_states = states_history + [(time.time() * 10, 'end')]
         featurespace = featurespace.unstack()
 
-        # filter featurespace with start session time
         featurespace = featurespace[featurespace.index.values >= extended_states[0][0]]
         cs = 0
         y = []
@@ -126,8 +118,9 @@ class ProtocolCommonState:
     def __init__(self, helmet, visuals, online_filters, physical_feedback, protocol_params,
                  filtered_data, features_data, ml, states_history, calibration_iter,
                  last_time_run, logger):
-        self.helmet = helmet,
-        self.visuals = visuals,
+
+        self.helmet = helmet
+        self.visuals = visuals
         self.online_filters = online_filters
         self.physical_feedback = physical_feedback
         self.protocol_params = protocol_params
@@ -169,7 +162,7 @@ class ProtocolCommonState:
 
     def update_data_charts(self):
 
-        new_q = get_data(self.helmet)
+        new_q = self.helmet.get_data()
 
         self.logger[0].writerow(new_q)
 
@@ -179,8 +172,8 @@ class ProtocolCommonState:
                                                  for i in range(8)]).T, new_data[:, 9][:, None]])
         self.filtered_data = np.append(self.filtered_data, new_filtered_data, axis=0)
         self.new_features_data = pd.DataFrame(
-            self.filtered_data[(np.where(self.filtered_data[:, 8] > int(self.last_time_run) - 1)) &
-                               (np.where(self.filtered_data[:, 8] <= int(time.time()) - 1))]
+            self.filtered_data[np.where((self.filtered_data[:, 8] > int(self.last_time_run) - 1) &
+                               (self.filtered_data[:, 8] <= int(time.time()) - 1))]
             ).groupby(8).apply(
             lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
 

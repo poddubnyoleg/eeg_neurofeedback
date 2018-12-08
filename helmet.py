@@ -13,8 +13,7 @@ class Helmet:
         if helmet_type == 'fake':
 
             def handle_sample():
-                global q
-                q.put([np.random.rand() for r in range(8)] + [time.time()] + [int(time.time())])
+                self.q.put([np.random.rand() for r in range(8)] + [time.time()] + [int(time.time())])
 
             def streaming():
                 while True:
@@ -25,8 +24,7 @@ class Helmet:
             import open_bci_connector
 
             def handle_sample(sample):
-                global q
-                q.put(sample.channel_data + [time.time()] + [int(time.time())])
+                self.q.put(sample.channel_data + [time.time()] + [int(time.time())])
                 # todo log_id for headset data
 
             def streaming():
@@ -36,3 +34,9 @@ class Helmet:
 
     def start_stream(self):
         self.p.start()
+
+    def get_data(self):
+        new_data = []
+        while not self.q.empty():
+            new_data.append(self.q.get())
+        return new_data
