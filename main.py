@@ -39,10 +39,10 @@ app = feedback_services.Application(helmet=my_helmet,
                                     physical_feedback=physical_feedback,
                                     protocol_params=dict(warm_period=5,
                                                          calibration_iters=2,
-                                                         calibration_halfiter_period=2 * 60,
-                                                         feedback_period=10 * 60,
-                                                         relax_period=2 * 60,
-                                                         recalibration_period=5 * 60,
+                                                         calibration_halfiter_period=5,
+                                                         feedback_period=10,
+                                                         relax_period=5,
+                                                         recalibration_period=5,
                                                          recalibration_accuracy=0.7)
                                     )
 

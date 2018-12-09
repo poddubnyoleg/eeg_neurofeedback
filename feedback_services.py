@@ -135,7 +135,7 @@ class ProtocolCommonState:
         self.logger = logger
         self.current_prediction = 0
 
-        self.params_to_pass = dict(helmet=self.helmet,
+        self.params_to_pass = '''dict(helmet=self.helmet,
                                    visuals=self.visuals,
                                    online_filters=self.online_filters,
                                    physical_feedback=self.physical_feedback,
@@ -147,7 +147,7 @@ class ProtocolCommonState:
                                    calibration_iter=self.calibration_iter,
                                    last_time_run=self.last_time_run,
                                    logger=self.logger
-                                   )
+                                   )'''
 
         self.human_state_mapper = {
             'CalibrationRelax': ['relax', 'calibration'],
@@ -191,7 +191,7 @@ class CalibrationRelax(ProtocolCommonState):
         self.update_data_charts()
         self.last_time_run = time.time()
         if time.time()-self.state_start > self.protocol_params['calibration_halfiter_period']:
-            return CalibrationTarget(**self.params_to_pass)
+            return CalibrationTarget(**eval(self.params_to_pass))
         return self
 
 
@@ -204,11 +204,11 @@ class CalibrationTarget(ProtocolCommonState):
         if time.time()-self.state_start > self.protocol_params['calibration_halfiter_period']:
             if self.calibration_iter < self.protocol_params['calibration_iters']:
                 self.calibration_iter += 1
-                return CalibrationRelax(**self.params_to_pass)
+                return CalibrationRelax(**eval(self.params_to_pass))
             else:
                 self.calibration_iter = 1
                 self.ml.fit(self.features_data, self.states_history, just_score=False)
-                return FeedbackTarget(**self.params_to_pass)
+                return FeedbackTarget(**eval(self.params_to_pass))
         return self
 
 
@@ -218,16 +218,17 @@ class FeedbackTarget(ProtocolCommonState):
         self.update_data_charts()
         self.last_time_run = time.time()
 
-        if self.last_time_run - self.state_start == self.protocol_params['recalibration_period']:
+        if int(self.last_time_run - self.state_start) == self.protocol_params['recalibration_period']:
             # todo check accuracy on last feedback period
             score = self.ml.fit(self.features_data, self.states_history, just_score=True)
+            print score
             if score < self.protocol_params['recalibration_accuracy']:
                 self.physical_feedback.sound_volume = 0
-                return CalibrationRelax(**self.params_to_pass)
+                return CalibrationRelax(**eval(self.params_to_pass))
 
         elif self.last_time_run - self.state_start > self.protocol_params['feedback_period']:
             self.physical_feedback.sound_volume = 0
-            return FeedbackRelax(**self.params_to_pass)
+            return FeedbackRelax(**eval(self.params_to_pass))
 
         self.current_prediction = self.ml.clf.predict_proba(
             self.new_features_data.unstack().values)[0][list(self.ml.clf.classes_).index('target')]
@@ -244,7 +245,9 @@ class FeedbackRelax(ProtocolCommonState):
 
         if self.last_time_run - self.state_start > self.protocol_params['relax_period']:
             self.ml.fit(self.features_data, self.states_history, just_score=False)
-            return FeedbackTarget(**self.params_to_pass)
+            return FeedbackTarget(**eval(self.params_to_pass))
+
+        return self
 
 
 class Application:
