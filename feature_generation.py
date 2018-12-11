@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from scipy.signal import butter, lfilter, iirnotch, lfilter_zi
 import pandas as pd
 import numpy as np
