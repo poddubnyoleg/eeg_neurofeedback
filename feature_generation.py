@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 
 
+# можешь тесты написать, здесь легко
+# заданный вход — проверенный выход
 class OnlineFilter:
 
     def __init__(self, fs, notch_f0, notch_q, low_cut, high_cut, order):

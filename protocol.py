@@ -10,6 +10,7 @@ import subprocess
 import multiprocessing
 
 
+# те же комментарии, что и в feedback_services
 class Protocol:
 
     @staticmethod
@@ -21,6 +22,10 @@ class Protocol:
         subprocess.call(["afplay", audio_file])
 
     # todo create smooth changer
+    # почему настройки звука в протоколе?
+    # почему не сделать отдельный объект, описывающий обратную связь
+    # можно будет сделать и текстовую обратную связь, а потом уже сделать
+    # вариант со звуком
     def change_volume(self, new_volume):
         self.volume_averaging_array.append(new_volume)
         self.volume_averaging_array.popleft()
@@ -32,7 +37,7 @@ class Protocol:
 
     '''
     Protocol settings:
-    
+
     warm_period - first seconds of new task to throw away from learning
     calibration_protocol - here we set alternating task with specified periods for initial calibration
     feedback_period - passing feedback after calibration

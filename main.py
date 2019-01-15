@@ -51,6 +51,8 @@ visuals.button_link(partial(button_func, app))
 
 visuals.add_layout()
 
+# у тебя на CTRL+C не выключается приложение фактически
+# желательно настроить callback на signal, который тебе явно будет выключать все
 thread = Thread(target=app_runner, args=(visuals.doc, app))
 thread.daemon = True  # to end session properly when terminating main thread with ctrl+c
 thread.start()

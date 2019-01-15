@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 import feature_generation
 import numpy as np
 import pandas as pd
@@ -185,6 +186,20 @@ class ProtocolCommonState:
                                      self.current_prediction)
 
 
+# вот это вообще не понял
+# что у тебя описывает ProtocolCommonState
+# state.run() вообще странно звучит
+
+# советую отделить состояние от его представления
+# вот у тебя данные все в одном классе
+# отдаешь его в какую нибудь шнягу для визуализации и рисуешь
+
+# вот эти методы `run` говорят о том, что у тебя нет языка описания области
+# когда у тебя есть нормальный язык и объекты, ему соответствующие
+# то код выглядит как английская проза
+# if state.relaxed(at_least=0.8):
+#     feedback.nice()
+
 class CalibrationRelax(ProtocolCommonState):
 
     def run(self):
@@ -221,7 +236,7 @@ class FeedbackTarget(ProtocolCommonState):
         if int(self.last_time_run - self.state_start) == self.protocol_params['recalibration_period']:
             # todo check accuracy on last feedback period
             score = self.ml.fit(self.features_data, self.states_history, just_score=True)
-            print score
+            print(score)
             if score < self.protocol_params['recalibration_accuracy']:
                 self.physical_feedback.sound_volume = 0
                 return CalibrationRelax(**eval(self.params_to_pass))

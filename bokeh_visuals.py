@@ -10,6 +10,10 @@ import numpy as np
 import time
 
 
+# если ты вынесешь в конструкторе хотя бы создание каждой фигуры
+# в отдельные методы, то будет гораздо понятнее
+# сейчас просто глазами скользишь и все :)
+# ну ты сам понимаешь, что тут мясо
 class BokehVisuals:
 
     # todo takes helmet as input to define layout

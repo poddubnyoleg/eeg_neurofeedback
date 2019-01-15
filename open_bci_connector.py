@@ -1,3 +1,4 @@
+from __future__ import print_function
 import openbci
 import time
 import sys
@@ -34,7 +35,7 @@ def serial_ports():
     return result
 
 
-print serial_ports()
+print(serial_ports())
 board = openbci.OpenBCICyton(port='/dev/tty.usbserial-DM00Q4BH')#raw_input("input serial port with board: "))
 
 s = 'x1050110Xx2050110Xx3050110Xx4050110Xx5050110Xx6050110Xx7050110Xx8050110X'
