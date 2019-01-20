@@ -28,7 +28,7 @@ def app_runner(doc, app):
         time.sleep(0.01)
 
 
-my_helmet = helmet.Helmet(helmet_type='fake')
+my_helmet = helmet.FakeHelmet()
 my_helmet.start_stream()
 
 visuals = bokeh_visuals.BokehVisuals()
