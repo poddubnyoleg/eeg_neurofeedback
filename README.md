@@ -51,7 +51,7 @@ sounddevice
 
 ## Installing
 ```
-git clone https://github.com/OpenBCI/OpenBCI_Python.git
+git clone https://github.com/poddubnyoleg/eeg_neurofeedback.git
 ```
 
 ## Running
