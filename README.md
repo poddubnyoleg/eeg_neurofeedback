@@ -3,6 +3,7 @@ Open-source EEG neurofeedback for meditation. Works with all popular EEG headset
 
 ## Prerequisites
 Mac OS X, Python 2.7 (Python 3 comparability is in progress)
+
 https://github.com/OpenBCI/OpenBCI_Python - OpenBCI python lib 
 ```
 pandas
