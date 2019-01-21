@@ -14,7 +14,7 @@ Current protocol goes like this:
 [relax → target → relax → target] → [feedback → accuracy check → feedback → relax] → feedback → ...
                                                         ↓
                                                    tuning phase → feedback phase → ...
-                                           ```
+```
 
 ## Prerequisites
 Mac OS X, Python 2.7 (Python 3 comparability is in progress)
