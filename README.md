@@ -3,6 +3,7 @@ Open-source EEG neurofeedback for meditation. Works with all popular EEG headset
 
 Base idea behind project is to fit brain pattern of mental activity on the fly (tuning phase) and then provide real-time sound feedback if required mental activity fades away (feedback phase). 
 
+## Protocol
 Current protocol goes like this:
 * calibration as sequence of relax and target state periods (relax -> target -> relax -> target)
 * machine learning is applied to eeg data and distinctive pattern is learnt
@@ -15,6 +16,26 @@ Current protocol goes like this:
                                                         ↓
                                                    tuning phase → feedback phase → ...
 ```
+Next protocol modification:
+* add voice commands to tell when meditator distracts, allowing additional learning from these examples
+
+## Headsets
+Current headsets available are:
+* Fake headset - providing synthetic data for testing
+* [OpenBCI Cyton](https://shop.openbci.com/products/cyton-biosensing-board-8-channel?variant=38958638542) with 8 electrodes
+
+Upcoming support for headsets:
+* [MUSE 2016](https://choosemuse.com/)
+* [MUSE 2](https://choosemuse.com/)
+* [NeuroSky MindWave Mobile 2] (http://neurosky.com/)
+
+## Maching learning and data processing
+Current pipeline:
+```[notch and bandpass filtering] → [1 second FFT spectrum with Hanning window] → [dimension reduction with PCA] → [Machine learning with Support Vector Machine classifier]```
+
+Next ML todo:
+* replace filtering and FFT with wavelet based decomposition, using optimization of mother wavelet 
+* use pre-computed autoencoding recurrent neural nets for general features extraction
 
 ## Prerequisites
 Mac OS X, Python 2.7 (Python 3 comparability is in progress)
