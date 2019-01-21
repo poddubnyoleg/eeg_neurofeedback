@@ -9,6 +9,12 @@ Current protocol goes like this:
 * feedback starts with increased sound volume, as target state fades away, that reminds meditator to go back into target state
 * after some period of time feedback accuracy is checked, and if accuracy is low, then calibration repeats
 * if accuracy is OK, then feedback contunues, and in some period of time starts relax state period, for meditator to have some rest and for machine learning to get new information, as during deepening of meditation brain patterns can change
+```
+          tuning phase                                  feedback phase
+[relax → target → relax → target] → [feedback → accuracy check → feedback → relax] → feedback → ...
+                                                        ↓
+                                                   tuning phase → feedback phase → ...
+                                           ```
 
 ## Prerequisites
 Mac OS X, Python 2.7 (Python 3 comparability is in progress)
