@@ -75,7 +75,8 @@ class TuningState:
                                     states_history=[],
                                     calibration_iter=1,
                                     last_time_run=time.time(),
-                                    logger=(csv.writer(open('raw_data.csv', 'wb'), delimiter=';'),)
+                                    logger={'raw_data':csv.writer(open('raw_data.csv', 'wb'), delimiter=';'),
+                                            'states_history':csv.writer(open('states_history.csv', 'wb'), delimiter=';')}
                                     )
         return self
 
@@ -156,7 +157,9 @@ class ProtocolCommonState:
             'FeedbackRelax': ['relax', 'feedback']
         }
 
-        self.states_history.append([self.state_start] + self.human_state_mapper[self.__class__.__name__])
+        current_state_name = [self.state_start] + self.human_state_mapper[self.__class__.__name__]
+        self.states_history.append(current_state_name)
+        self.logger['states_history'].writerow(current_state_name)
 
         alert('switch')
 
@@ -164,7 +167,7 @@ class ProtocolCommonState:
 
         new_q = self.helmet.get_data()
 
-        self.logger[0].writerow(new_q)
+        self.logger['raw_data'].writerows(new_q)
 
         new_data = np.array(new_q)
         # [:,None] - to make arrays the same shape for hstack

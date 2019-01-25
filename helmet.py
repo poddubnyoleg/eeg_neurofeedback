@@ -16,6 +16,9 @@ class Helmet(object):
         self.q = multiprocessing.Queue()
         self.p = multiprocessing.Process(target=self.streaming)
 
+    def insert_sample_record(self, sample):
+        self.q.put(sample.channel_data + [time.time()] + [int(time.time())])
+
     def start_stream(self):
         self.p.start()
 
@@ -26,25 +29,24 @@ class Helmet(object):
         return new_data
 
 
-class FakeHelmet(Helmet):
+class FakeHelmetSample(object):
 
-    def handle_sample(self):
-        self.q.put([np.random.rand() for r in range(8)] + [time.time()] + [int(time.time())])
+    def __init__(self):
+        self.channel_data = [np.random.rand() for r in range(8)]
+
+
+class FakeHelmet(Helmet):
 
     def streaming(self):
         while True:
-            self.handle_sample()
+            self.insert_sample_record(FakeHelmetSample())
             time.sleep(0.01)
 
 
 class CytonHelmet(Helmet):
 
-    def handle_sample(self, sample):
-        self.q.put(sample.channel_data + [time.time()] + [int(time.time())])
-        # todo log_id for headset data
-
     def streaming(self):
-        self.board.start_streaming(self.handle_sample)
+        self.board.start_streaming(callback=self.insert_sample_record)
 
     def __init__(self):
         self.board = openbci.OpenBCICyton(port='/dev/tty.usbserial-DM00Q4BH')

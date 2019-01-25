@@ -116,7 +116,7 @@ class BokehVisuals:
         for i in range(8):
             update_data['value_' + str(i)] = new_features_data[i].values
 
-        self.cds_feats.stream(update_data, len(new_features_data.columns) * 8 * 1000)
+        self.cds_feats.stream(update_data, len(new_features_data.columns) * 8 * 100)
 
         if current_state[0] == 'target':
             stage = 1
