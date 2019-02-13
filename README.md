@@ -29,7 +29,7 @@ Upcoming support for headsets:
 * [MUSE 2](https://choosemuse.com/)
 * [NeuroSky MindWave Mobile 2] (http://neurosky.com/)
 
-## Maching learning and data processing
+## Machine learning and data processing
 Current pipeline:
 ```[notch and bandpass filtering] → [1 second FFT spectrum with Hanning window] → [dimension reduction with PCA] → [Machine learning with Support Vector Machine classifier]```
 
