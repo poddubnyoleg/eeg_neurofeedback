@@ -45,7 +45,7 @@ else:
 
 my_helmet.start_stream()
 
-visuals = bokeh_visuals.BokehVisuals()
+visuals = bokeh_visuals.BokehVisuals(my_helmet)
 physical_feedback = feedback_services.PhysicalFeedback()
 
 app = feedback_services.Application(helmet=my_helmet,

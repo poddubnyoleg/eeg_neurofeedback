@@ -50,15 +50,17 @@ class TuningState:
         self.protocol_params = protocol_params
         self.online_filters = [
             feature_generation.OnlineFilter(fs=250, notch_f0=50, notch_q=30, low_cut=1, high_cut=40, order=5) for
-            i in range(8)]
+            i in range(self.helmet.channels_number)]
         self.tuning_phase = True
-        self.filtered_data = np.ndarray(shape=(0, 9))
+        self.filtered_data = np.ndarray(shape=(0, self.helmet.channels_number+1))
 
     def run(self):
         new_data = np.array(self.helmet.get_data())
         # [:,None] - to make arrays the same shape for hstack
         new_filtered_data = np.hstack([np.array([self.online_filters[i].filter(new_data[:, i])
-                                                 for i in range(8)]).T, new_data[:, 9][:, None]])
+                                                 for i in range(self.helmet.channels_number)]).T,
+                                       new_data[:, self.helmet.channels_number+1][:, None]])
+
         self.filtered_data = np.append(self.filtered_data, new_filtered_data, axis=0)
 
         self.visuals.update_tuning(new_data, new_filtered_data, self.filtered_data)
@@ -113,7 +115,6 @@ class MachineLearning:
             return self.clf.score(featurespace.values, y)
 
 
-# todo add logger
 class ProtocolCommonState:
 
     def __init__(self, helmet, visuals, online_filters, physical_feedback, protocol_params,
@@ -172,13 +173,18 @@ class ProtocolCommonState:
         new_data = np.array(new_q)
         # [:,None] - to make arrays the same shape for hstack
         new_filtered_data = np.hstack([np.array([self.online_filters[i].filter(new_data[:, i])
-                                                 for i in range(8)]).T, new_data[:, 9][:, None]])
+                                                 for i in range(self.helmet.channels_number)]).T,
+                                       new_data[:, self.helmet.channels_number+1][:, None]])
+
         self.filtered_data = np.append(self.filtered_data, new_filtered_data, axis=0)
+
         self.new_features_data = pd.DataFrame(
-            self.filtered_data[np.where((self.filtered_data[:, 8] > int(self.last_time_run) - 1) &
-                               (self.filtered_data[:, 8] <= int(time.time()) - 1))]
-            ).groupby(8).apply(
-            lambda x: pd.DataFrame([feature_generation.spectral_features(x[i]) for i in range(8)]).T)
+            self.filtered_data[np.where((self.filtered_data[:, self.helmet.channels_number] >
+                                         int(self.last_time_run) - 1) &
+                               (self.filtered_data[:, self.helmet.channels_number] <= int(time.time()) - 1))]
+            ).groupby(self.helmet.channels_number).apply(
+            lambda x: pd.DataFrame([feature_generation.spectral_features(x[i])
+                                    for i in range(self.helmet.channels_number)]).T)
 
         self.features_data = self.features_data.append(self.new_features_data)
 
