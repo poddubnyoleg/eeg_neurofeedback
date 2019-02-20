@@ -13,6 +13,7 @@ class Helmet(object):
     def __init__(self):
 
         self.channels_number = 8
+        self.sampling_rate = 250
         self.q = multiprocessing.Queue()
         self.p = multiprocessing.Process(target=self.streaming)
 
@@ -60,18 +61,21 @@ class MuseHelmet(Helmet):
         from muselsl import stream, list_muses
         from pylsl import StreamInlet, resolve_byprop
 
-        self.channels_number = 4
-
         muses = list_muses()
 
         # stream module connects with Muse, but doesn't start streaming data
-        muse_ble_connect = multiprocessing.Process(target=stream, args=(muses[0]['address'],))
-        muse_ble_connect.start()
+        self.muse_ble_connect = multiprocessing.Process(target=stream, args=(muses[0]['address'],))
+        self.muse_ble_connect.start()
 
-        streams = resolve_byprop('type', 'EEG', timeout=2)
-        inlet = StreamInlet(streams[0], max_chunklen=12)
+        time.sleep(10)
+
+        self.streams = resolve_byprop('type', 'EEG', timeout=2)
+        self.inlet = StreamInlet(self.streams[0], max_chunklen=1)
 
         Helmet.__init__(self)
+
+        self.channels_number = 4
+        self.sampling_rate = 256
 
     # Muse lsl streams data in chunks with predefined timestamps
     # so putting data in queue is in streaming func, passing insert_sample

@@ -105,7 +105,7 @@ class BokehVisuals:
 
         rows = []
         for i in range(int(self.channels_number)/2):
-            rows.append(row(self.figs[i:i+2] + self.figs_feats[i:i+2]))
+            rows.append(row(self.figs[i*2:i*2+2] + self.figs_feats[i*2:i*2+2]))
         # todo add option for uneven channel count
 
         rows.append(row(widgetbox([self.update_button], width=200), self.status_text_figure,

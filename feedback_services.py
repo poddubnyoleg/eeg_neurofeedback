@@ -49,13 +49,18 @@ class TuningState:
         self.physical_feedback = physical_feedback
         self.protocol_params = protocol_params
         self.online_filters = [
-            feature_generation.OnlineFilter(fs=250, notch_f0=50, notch_q=30, low_cut=1, high_cut=40, order=5) for
+            feature_generation.OnlineFilter(fs=self.helmet.sampling_rate, notch_f0=50, notch_q=30,
+                                            low_cut=1, high_cut=40, order=5) for
             i in range(self.helmet.channels_number)]
+
         self.tuning_phase = True
         self.filtered_data = np.ndarray(shape=(0, self.helmet.channels_number+1))
 
     def run(self):
         new_data = np.array(self.helmet.get_data())
+        print '\n\n\n\n\n\n'
+        print new_data.shape
+        print self.helmet.channels_number
         # [:,None] - to make arrays the same shape for hstack
         new_filtered_data = np.hstack([np.array([self.online_filters[i].filter(new_data[:, i])
                                                  for i in range(self.helmet.channels_number)]).T,
