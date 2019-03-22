@@ -23,9 +23,9 @@ Next protocol modification:
 Current headsets available are:
 * Fake headset - providing synthetic data for testing
 * [OpenBCI Cyton](https://shop.openbci.com/products/cyton-biosensing-board-8-channel?variant=38958638542) with 8 electrodes
+* [MUSE 2016](https://choosemuse.com/)
 
 Upcoming support for headsets:
-* [MUSE 2016](https://choosemuse.com/)
 * [MUSE 2](https://choosemuse.com/)
 * [NeuroSky MindWave Mobile 2] (http://neurosky.com/)
 
