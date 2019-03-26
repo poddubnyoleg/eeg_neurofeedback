@@ -37,15 +37,18 @@ if len(sys.argv)>1:
         my_helmet = helmet.FakeHelmet()
     elif sys.argv[1] == 'CytonHelmet':
         my_helmet = helmet.CytonHelmet()
+    elif sys.argv[1] == 'MuseHelmet':
+        my_helmet = helmet.MuseHelmet()
     else:
-        raise NameError('\n Proper helmet type is not defined. Available options: FakeHelmet, CytonHelmet \n')
+        raise NameError('\n Proper helmet type is not defined. Available options: FakeHelmet, CytonHelmet, MuseHelmet \n')
 else:
     print('\n No helmet is defined. FakeHelmet is used by default \n')
     my_helmet = helmet.FakeHelmet()
 
 my_helmet.start_stream()
 
-visuals = bokeh_visuals.BokehVisuals()
+visuals = bokeh_visuals.BokehVisuals(my_helmet)
+
 physical_feedback = feedback_services.PhysicalFeedback()
 
 app = feedback_services.Application(helmet=my_helmet,
