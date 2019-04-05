@@ -58,9 +58,6 @@ class TuningState:
 
     def run(self):
         new_data = np.array(self.helmet.get_data())
-        print '\n\n\n\n\n\n'
-        print new_data.shape
-        print self.helmet.channels_number
         # [:,None] - to make arrays the same shape for hstack
         new_filtered_data = np.hstack([np.array([self.online_filters[i].filter(new_data[:, i])
                                                  for i in range(self.helmet.channels_number)]).T,
@@ -79,8 +76,13 @@ class TuningState:
                                     filtered_data=self.filtered_data,
                                     features_data=pd.DataFrame(),
                                     ml=MachineLearning(),
+                                    # todo set features options outside
+                                    featurizer=feature_generation.SpectralFeaturizer(self.helmet.channels_number,
+                                                                                     2,  # window_seconds_size
+                                                                                     self.helmet.sampling_rate,
+                                                                                     50), # higher_freq_bound
                                     states_history=[],
-                                    calibration_iter=1,
+                                    calibration_iter=   1,
                                     last_time_run=time.time(),
                                     logger={'raw_data':csv.writer(open('raw_data.csv', 'wb'), delimiter=';'),
                                             'states_history':csv.writer(open('states_history.csv', 'wb'), delimiter=';')}
@@ -124,7 +126,7 @@ class ProtocolCommonState:
 
     def __init__(self, helmet, visuals, online_filters, physical_feedback, protocol_params,
                  filtered_data, features_data, ml, states_history, calibration_iter,
-                 last_time_run, logger):
+                 last_time_run, logger, featurizer):
 
         self.helmet = helmet
         self.visuals = visuals
@@ -141,6 +143,7 @@ class ProtocolCommonState:
         self.new_features_data = pd.DataFrame()
         self.logger = logger
         self.current_prediction = 0
+        self.featurizer = featurizer
 
         self.params_to_pass = '''dict(helmet=self.helmet,
                                    visuals=self.visuals,
@@ -153,7 +156,8 @@ class ProtocolCommonState:
                                    states_history=self.states_history,
                                    calibration_iter=self.calibration_iter,
                                    last_time_run=self.last_time_run,
-                                   logger=self.logger
+                                   logger=self.logger,
+                                   featurizer=self.featurizer
                                    )'''
 
         self.human_state_mapper = {
@@ -183,15 +187,20 @@ class ProtocolCommonState:
 
         self.filtered_data = np.append(self.filtered_data, new_filtered_data, axis=0)
 
-        self.new_features_data = pd.DataFrame(
-            self.filtered_data[np.where((self.filtered_data[:, self.helmet.channels_number] >
-                                         int(self.last_time_run) - 1) &
-                               (self.filtered_data[:, self.helmet.channels_number] <= int(time.time()) - 1))]
-            ).groupby(self.helmet.channels_number).apply(
-            lambda x: pd.DataFrame([feature_generation.spectral_features(x[i])
-                                    for i in range(self.helmet.channels_number)]).T)
+        # self.new_features_data = pd.DataFrame(
+        #     self.filtered_data[np.where((self.filtered_data[:, self.helmet.channels_number] >
+        #                                  int(self.last_time_run)) &
+        #                        (self.filtered_data[:, self.helmet.channels_number] <= int(time.time()) ))]
+        #     ).groupby(self.helmet.channels_number).apply(
+        #     lambda x: pd.DataFrame([feature_generation.spectral_features(x[i])
+        #                             for i in range(self.helmet.channels_number)]).T)
+
+        self.new_features_data = self.featurizer.calculate_features(
+            self.filtered_data[np.where((self.filtered_data[:, self.helmet.channels_number] ==
+                                         int(self.last_time_run)))])
 
         self.features_data = self.features_data.append(self.new_features_data)
+        # features_data: index(time, freq), channels
 
         self.visuals.update_tuning(new_data, new_filtered_data, self.filtered_data)
         self.visuals.update_protocol(self.new_features_data,

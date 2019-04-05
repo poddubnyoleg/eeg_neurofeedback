@@ -48,7 +48,7 @@ class BokehVisuals:
         self.cds_feats = ColumnDataSource(data=cds_feats_data)
 
         colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-        mapper = LinearColorMapper(palette=colors, low=10, high=70)
+        mapper = LinearColorMapper(palette=colors, low=10, high=30)
 
         self.figs_feats = [figure(plot_width=400, plot_height=120, toolbar_location=None)
                            for i in range(self.channels_number)]
@@ -85,9 +85,9 @@ class BokehVisuals:
 
         self.update_button = Button(label="Start session")
 
-    def __init__(self, helmet):
+    def __init__(self, channels_number):
 
-        self.channels_number = helmet.channels_number
+        self.channels_number = channels_number
 
         self.create_testing_charts()
         self.create_features_charts()

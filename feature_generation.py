@@ -32,3 +32,32 @@ class OnlineFilter:
 def spectral_features(x):
     # parameters taken following research
     return pd.Series(20 * np.log10(np.abs(np.fft.rfft(x*np.hanning(len(x)), n=256*2))[:80]))
+
+
+class SpectralFeaturizer():
+
+    def __init__(self, channels_number, window_seconds_size, sampling_rate, higher_freq_bound):
+
+        self.channels_number = channels_number
+        self.window_seconds_size = window_seconds_size
+        self.sampling_rate = sampling_rate
+        self.higher_freq_bound = higher_freq_bound
+        self.buffer_size = self.sampling_rate*self.window_seconds_size
+
+        self.data_buffer = np.zeros((self.buffer_size, self.channels_number))
+
+    def calculate_features(self, new_data):
+
+        self.data_buffer = np.append(self.data_buffer, new_data[:, :self.channels_number], axis=0)[ -self.buffer_size:, :]
+        x = self.data_buffer
+        # channels, seconds
+
+        r = pd.DataFrame([pd.Series(10 * np.log10(np.abs(np.fft.rfft(x[:, i]*np.hanning(len(x[:, i])),
+                                                                     n=self.sampling_rate*2))[
+                                       :2*self.higher_freq_bound]))
+                          for i in range(self.channels_number)]).T
+
+        r['time'] = max(new_data[:,self.channels_number])
+        r = r.reset_index().set_index(['time', 'index'])
+
+        return r

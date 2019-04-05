@@ -28,7 +28,7 @@ def app_runner(doc, app):
 
         time.sleep(0.01)
 
-
+# todo add config
 # Helmet type is gotten via sys.argv options
 # Current helmets available: FakeHelmet, CytonHelmet
 
@@ -47,7 +47,7 @@ else:
 
 my_helmet.start_stream()
 
-visuals = bokeh_visuals.BokehVisuals(my_helmet)
+visuals = bokeh_visuals.BokehVisuals(my_helmet.channels_number)
 
 physical_feedback = feedback_services.PhysicalFeedback()
 
