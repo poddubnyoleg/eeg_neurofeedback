@@ -1,0 +1,7 @@
+pandas
+sounddevice
+bokeh
+scipy
+sklearn
+pylsl
+openbci

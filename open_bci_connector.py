@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import openbci
 import time
 import sys
@@ -13,15 +14,15 @@ def serial_ports():
         :returns:
             A list of the serial ports available on the system
     """
-    if sys.platform.startswith('win'):
-        ports = ['COM%s' % (i + 1) for i in range(256)]
-    elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
+    if sys.platform.startswith("win"):
+        ports = ["COM%s" % (i + 1) for i in range(256)]
+    elif sys.platform.startswith("linux") or sys.platform.startswith("cygwin"):
         # this excludes your current terminal "/dev/tty"
-        ports = glob.glob('/dev/tty[A-Za-z]*')
-    elif sys.platform.startswith('darwin'):
-        ports = glob.glob('/dev/tty.*')
+        ports = glob.glob("/dev/tty[A-Za-z]*")
+    elif sys.platform.startswith("darwin"):
+        ports = glob.glob("/dev/tty.*")
     else:
-        raise EnvironmentError('Unsupported platform')
+        raise EnvironmentError("Unsupported platform")
 
     result = []
     for port in ports:
@@ -34,15 +35,15 @@ def serial_ports():
     return result
 
 
-print serial_ports()
-board = openbci.OpenBCICyton(port='/dev/tty.usbserial-DM00Q4BH')#raw_input("input serial port with board: "))
+print(serial_ports())
+board = openbci.OpenBCICyton(
+    port="/dev/tty.usbserial-DM00Q4BH"
+)  # raw_input("input serial port with board: "))
 
-s = 'x1050110Xx2050110Xx3050110Xx4050110Xx5050110Xx6050110Xx7050110Xx8050110X'
-#for c in s:
+s = "x1050110Xx2050110Xx3050110Xx4050110Xx5050110Xx6050110Xx7050110Xx8050110X"
+# for c in s:
 #    if sys.hexversion > 0x03000000:
 #        board.ser_write(bytes(c, 'utf-8'))
 #    else:
 #        board.ser_write(bytes(c))
 #    time.sleep(0.100)
-
-
