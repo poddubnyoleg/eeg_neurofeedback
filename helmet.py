@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import time
 import numpy as np
@@ -6,7 +7,6 @@ from functools import partial
 
 
 class Helmet(object):
-
     def streaming(self):
         pass
 
@@ -31,13 +31,11 @@ class Helmet(object):
 
 
 class FakeHelmetSample(object):
-
     def __init__(self):
         self.channel_data = [np.random.rand() for r in range(8)]
 
 
 class FakeHelmet(Helmet):
-
     def streaming(self):
         while True:
             self.insert_sample_record(FakeHelmetSample())
@@ -45,18 +43,17 @@ class FakeHelmet(Helmet):
 
 
 class CytonHelmet(Helmet):
-
     def streaming(self):
         self.board.start_streaming(callback=self.insert_sample_record)
 
     def __init__(self):
         import openbci
-        self.board = openbci.OpenBCICyton(port='/dev/tty.usbserial-DM00Q4BH')
+
+        self.board = openbci.OpenBCICyton(port="/dev/tty.usbserial-DM00Q4BH")
         Helmet.__init__(self)
 
 
 class MuseHelmet(Helmet):
-
     def __init__(self):
         from muselsl import stream, list_muses
         from pylsl import StreamInlet, resolve_byprop
@@ -64,12 +61,14 @@ class MuseHelmet(Helmet):
         muses = list_muses()
 
         # stream module connects with Muse, but doesn't start streaming data
-        self.muse_ble_connect = multiprocessing.Process(target=stream, args=(muses[0]['address'],))
+        self.muse_ble_connect = multiprocessing.Process(
+            target=stream, args=(muses[0]["address"],)
+        )
         self.muse_ble_connect.start()
 
         time.sleep(10)
 
-        self.streams = resolve_byprop('type', 'EEG', timeout=2)
+        self.streams = resolve_byprop("type", "EEG", timeout=2)
         self.inlet = StreamInlet(self.streams[0], max_chunklen=1)
 
         Helmet.__init__(self)
@@ -83,8 +82,7 @@ class MuseHelmet(Helmet):
         # channels: TP9, AF7, AF8, TP10, Right Aux (not used)
         while True:
 
-            eeg_data, timestamp = self.inlet.pull_chunk(
-                timeout=0)
+            eeg_data, timestamp = self.inlet.pull_chunk(timeout=0)
 
             # todo put chunk, concat eeg and time arrays
             for i in range(len(timestamp)):
@@ -95,4 +93,4 @@ class MuseHelmet(Helmet):
     # todo make unique signature with inlet.pull_sample
     def insert_sample_record(self, sample):
         pass
-        #self.q.put(sample.channel_data + [time.time()] + [int(time.time())])
+        # self.q.put(sample.channel_data + [time.time()] + [int(time.time())])
