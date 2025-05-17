@@ -9,4 +9,4 @@ inlet = StreamInlet(streams[0], max_chunklen=12)
 eeg_time_correction = inlet.time_correction()
 
 
-print 'here'
+print('here')

@@ -58,9 +58,9 @@ class TuningState:
 
     def run(self):
         new_data = np.array(self.helmet.get_data())
-        print '\n\n\n\n\n\n'
-        print new_data.shape
-        print self.helmet.channels_number
+        print("\n\n\n\n\n\n")
+        print(new_data.shape)
+        print(self.helmet.channels_number)
         # [:,None] - to make arrays the same shape for hstack
         new_filtered_data = np.hstack([np.array([self.online_filters[i].filter(new_data[:, i])
                                                  for i in range(self.helmet.channels_number)]).T,
@@ -82,8 +82,8 @@ class TuningState:
                                     states_history=[],
                                     calibration_iter=1,
                                     last_time_run=time.time(),
-                                    logger={'raw_data':csv.writer(open('raw_data.csv', 'wb'), delimiter=';'),
-                                            'states_history':csv.writer(open('states_history.csv', 'wb'), delimiter=';')}
+                                    logger={'raw_data': csv.writer(open('raw_data.csv', 'w', newline=''), delimiter=';'),
+                                            'states_history': csv.writer(open('states_history.csv', 'w', newline=''), delimiter=';')}
                                     )
         return self
 
@@ -235,7 +235,7 @@ class FeedbackTarget(ProtocolCommonState):
         if int(self.last_time_run - self.state_start) == self.protocol_params['recalibration_period']:
             # todo check accuracy on last feedback period
             score = self.ml.fit(self.features_data, self.states_history, just_score=True)
-            print score
+            print(score)
             if score < self.protocol_params['recalibration_accuracy']:
                 self.physical_feedback.sound_volume = 0
                 return CalibrationRelax(**eval(self.params_to_pass))

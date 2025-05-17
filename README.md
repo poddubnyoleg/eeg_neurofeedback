@@ -38,7 +38,7 @@ Next ML todo:
 * use pre-computed autoencoding recurrent neural nets for general features extraction
 
 ## Prerequisites
-Mac OS X, Python 2.7 (Python 3 comparability is in progress)
+Mac OS X, Python 3 (tested with Python 3.8 or newer)
 
 https://github.com/OpenBCI/OpenBCI_Python - OpenBCI python lib 
 ```
